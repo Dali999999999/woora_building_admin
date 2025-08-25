@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'apiservice.dart';
 
-// --- WIDGET PRINCIPAL DE LA VUE ---
 class PropertyConfigView extends StatefulWidget {
   const PropertyConfigView({super.key});
 
@@ -11,19 +10,27 @@ class PropertyConfigView extends StatefulWidget {
   State<PropertyConfigView> createState() => _PropertyConfigViewState();
 }
 
-class _PropertyConfigViewState extends State<PropertyConfigView> {
-  late Future<List<dynamic>> _dataFuture;
+class _PropertyConfigViewState extends State<PropertyConfigView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  late Future<List<dynamic>> _propertyTypesFuture;
   List<bool> _isExpanded = [];
 
   @override
   void initState() {
     super.initState();
-    _reloadData();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadPropertyTypes();
   }
 
-  void _reloadData() {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _loadPropertyTypes() {
     setState(() {
-      _dataFuture = ApiService.getPropertyTypesWithAttributes().then((data) {
+      _propertyTypesFuture = ApiService.getPropertyTypesWithAttributes().then((data) {
         if (mounted) {
           setState(() {
             _isExpanded = List<bool>.filled(data.length, false);
@@ -50,7 +57,7 @@ class _PropertyConfigViewState extends State<PropertyConfigView> {
     ).then((success) {
       if (success == true) {
         _showSnackBar('Type de bien sauvegardé !');
-        _reloadData();
+        _loadPropertyTypes();
       }
     });
   }
@@ -58,7 +65,7 @@ class _PropertyConfigViewState extends State<PropertyConfigView> {
   void _showAddAttributeDialog() {
     showDialog(
       context: context,
-      builder: (_) => const _AddAttributeDialog(),
+      builder: (_) => const _AddEditAttributeDialog(), // Utilise le même dialogue pour l'ajout
     ).then((success) {
       if (success == true) {
         _showSnackBar('Attribut créé avec succès !');
@@ -75,7 +82,7 @@ class _PropertyConfigViewState extends State<PropertyConfigView> {
     ).then((success) {
       if (success == true) {
         _showSnackBar('Associations mises à jour !');
-        _reloadData();
+        _loadPropertyTypes();
       }
     });
   }
@@ -95,7 +102,7 @@ class _PropertyConfigViewState extends State<PropertyConfigView> {
               try {
                 await ApiService.deletePropertyType(id);
                 _showSnackBar('Type supprimé avec succès.');
-                _reloadData();
+                _loadPropertyTypes();
               } catch (e) {
                 _showSnackBar(e.toString(), isError: true);
               }
@@ -109,85 +116,114 @@ class _PropertyConfigViewState extends State<PropertyConfigView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<List<dynamic>>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Erreur: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucun type de bien trouvé. Ajoutez-en un !'));
-          }
+      appBar: AppBar(
+        title: const Text('Configuration des Biens'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Types de Biens'),
+            Tab(text: 'Gestion des Attributs'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Contenu de l'onglet "Types de Biens"
+          FutureBuilder<List<dynamic>>(
+            future: _propertyTypesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Erreur: ${snapshot.error}'));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text('Aucun type de bien trouvé. Ajoutez-en un !'));
+              }
 
-          final types = snapshot.data!;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: ExpansionPanelList(
-              expansionCallback: (int index, bool isExpanded) {
-                setState(() {
-                  _isExpanded[index] = !isExpanded;
-                });
-              },
-              children: types.asMap().entries.map<ExpansionPanel>((entry) {
-                int idx = entry.key;
-                dynamic type = entry.value;
-                List<dynamic> attributes = type['attributes'] ?? [];
+              final types = snapshot.data!;
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: ExpansionPanelList(
+                  expansionCallback: (int index, bool isExpanded) {
+                    setState(() {
+                      _isExpanded[index] = !isExpanded;
+                    });
+                  },
+                  children: types.asMap().entries.map<ExpansionPanel>((entry) {
+                    int idx = entry.key;
+                    dynamic type = entry.value;
+                    List<dynamic> attributes = type['attributes'] ?? [];
 
-                return ExpansionPanel(
-                  isExpanded: _isExpanded[idx],
-                  headerBuilder: (BuildContext context, bool isExpanded) {
-                    return ListTile(
-                      title: Text(type['name'], style: Theme.of(context).textTheme.titleLarge),
-                      subtitle: Text(type['description'] ?? 'Pas de description'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(icon: const Icon(Icons.edit, color: Colors.blue), tooltip: 'Modifier le type', onPressed: () => _showAddEditTypeDialog(propertyType: type)),
-                          IconButton(icon: const Icon(Icons.rule, color: Colors.orange), tooltip: 'Gérer les attributs associés', onPressed: () => _showManageScopesDialog(type)),
-                          IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Supprimer le type', onPressed: () => _confirmDeleteType(type['id'], type['name'])),
-                        ],
+                    return ExpansionPanel(
+                      isExpanded: _isExpanded[idx],
+                      headerBuilder: (BuildContext context, bool isExpanded) {
+                        return ListTile(
+                          title: Text(type['name'], style: Theme.of(context).textTheme.titleLarge),
+                          subtitle: Text(type['description'] ?? 'Pas de description'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(icon: const Icon(Icons.edit, color: Colors.blue), tooltip: 'Modifier le type', onPressed: () => _showAddEditTypeDialog(propertyType: type)),
+                              IconButton(icon: const Icon(Icons.rule, color: Colors.orange), tooltip: 'Gérer les attributs associés', onPressed: () => _showManageScopesDialog(type)),
+                              IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Supprimer le type', onPressed: () => _confirmDeleteType(type['id'], type['name'])),
+                            ],
+                          ),
+                        );
+                      },
+                      body: Padding(
+                        padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                        child: attributes.isEmpty
+                            ? const Align(alignment: Alignment.centerLeft, child: Text('Aucun attribut associé.'))
+                            : Wrap(
+                                spacing: 8.0,
+                                runSpacing: 4.0,
+                                children: attributes.map<Widget>((attr) {
+                                  return Chip(
+                                    label: Text(attr['name']),
+                                    avatar: Icon(attr['is_filterable'] == true ? Icons.filter_alt : Icons.filter_alt_off, size: 18),
+                                  );
+                                }).toList(),
+                              ),
                       ),
                     );
-                  },
-                  body: Padding(
-                    padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
-                    child: attributes.isEmpty
-                        ? const Align(alignment: Alignment.centerLeft, child: Text('Aucun attribut associé.'))
-                        : Wrap(
-                            spacing: 8.0,
-                            runSpacing: 4.0,
-                            children: attributes.map<Widget>((attr) {
-                              return Chip(
-                                label: Text(attr['name']),
-                                avatar: Icon(attr['is_filterable'] == true ? Icons.filter_alt : Icons.filter_alt_off, size: 18),
-                              );
-                            }).toList(),
-                          ),
-                  ),
-                );
-              }).toList(),
-            ),
-          );
-        },
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          // Contenu de l'onglet "Gestion des Attributs"
+          const AttributeManagementView(),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          showModalBottomSheet(context: context, builder: (ctx) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(leading: const Icon(Icons.add_box), title: const Text('Ajouter un Type de Bien'), onTap: (){ Navigator.pop(ctx); _showAddEditTypeDialog(); }),
-              ListTile(leading: const Icon(Icons.add_to_photos), title: const Text('Créer un nouvel Attribut'), onTap: (){ Navigator.pop(ctx); _showAddAttributeDialog(); }),
-            ],
-          ));
+          if (_tabController.index == 0) { // Onglet Types de Biens
+            showModalBottomSheet(context: context, builder: (ctx) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(leading: const Icon(Icons.add_box), title: const Text('Ajouter un Type de Bien'), onTap: (){ 
+                  Navigator.pop(ctx);
+                  _showAddEditTypeDialog();
+                }),
+                ListTile(leading: const Icon(Icons.add_to_photos), title: const Text('Créer un nouvel Attribut'), onTap: (){
+                  Navigator.pop(ctx);
+                  _showAddAttributeDialog();
+                }),
+              ],
+            ));
+          } else { // Onglet Gestion des Attributs
+            _showAddAttributeDialog();
+          }
         },
         label: const Text('Ajouter'),
         icon: const Icon(Icons.add),
       ),
     );
   }
+
 }
 
 // --- DIALOGUE POUR AJOUTER/MODIFIER UN TYPE DE BIEN ---
@@ -398,6 +434,218 @@ class _ManageScopesDialogState extends State<_ManageScopesDialog> {
       actions: [
         TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(context).pop()),
         if (_isLoading) const CircularProgressIndicator() else ElevatedButton(child: const Text('Sauvegarder'), onPressed: _submit),
+      ],
+    );
+  }
+}
+
+// --- WIDGET POUR LA GESTION DES ATTRIBUTS ---
+class AttributeManagementView extends StatefulWidget {
+  const AttributeManagementView({super.key});
+
+  @override
+  State<AttributeManagementView> createState() => _AttributeManagementViewState();
+}
+
+class _AttributeManagementViewState extends State<AttributeManagementView> {
+  late Future<List<dynamic>> _attributesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttributes();
+  }
+
+  void _loadAttributes() {
+    setState(() {
+      _attributesFuture = ApiService.getAllAttributes();
+    });
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
+    );
+  }
+
+  void _showAddEditAttributeDialog({dynamic attribute}) {
+    showDialog(
+      context: context,
+      builder: (_) => _AddEditAttributeDialog(attribute: attribute),
+    ).then((success) {
+      if (success == true) {
+        _showSnackBar('Attribut sauvegardé !');
+        _loadAttributes();
+      }
+    });
+  }
+
+  void _confirmDeleteAttribute(int id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: Text('Voulez-vous vraiment supprimer l\'attribut "$name" ?'),
+        actions: [
+          TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(ctx).pop()),
+          TextButton(
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            onPressed: () async {
+              Navigator.of(ctx).pop(); // Ferme le dialogue avant l\'appel API
+              try {
+                await ApiService.deletePropertyAttribute(id);
+                _showSnackBar('Attribut supprimé avec succès.');
+                _loadAttributes();
+              } catch (e) {
+                _showSnackBar(e.toString(), isError: true);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: FutureBuilder<List<dynamic>>(
+        future: _attributesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Erreur: ${snapshot.error}'));
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('Aucun attribut trouvé. Créez-en un !'));
+          }
+
+          final attributes = snapshot.data!;
+          return ListView.builder(
+            itemCount: attributes.length,
+            itemBuilder: (context, index) {
+              final attr = attributes[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ListTile(
+                  title: Text(attr['name']),
+                  subtitle: Text('Type: ${attr['data_type']} - Filtrable: ${attr['is_filterable'] ? 'Oui' : 'Non'}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        tooltip: 'Modifier l\'attribut',
+                        onPressed: () => _showAddEditAttributeDialog(attribute: attr),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        tooltip: 'Supprimer l\'attribut',
+                        onPressed: () => _confirmDeleteAttribute(attr['id'], attr['name']),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- DIALOGUE POUR AJOUTER/MODIFIER UN ATTRIBUT ---
+class _AddEditAttributeDialog extends StatefulWidget {
+  final dynamic attribute;
+  const _AddEditAttributeDialog({this.attribute});
+
+  @override
+  State<_AddEditAttributeDialog> createState() => __AddEditAttributeDialogState();
+}
+
+class __AddEditAttributeDialogState extends State<_AddEditAttributeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _optionsController = TextEditingController();
+  late String _dataType;
+  late bool _isFilterable;
+  bool get _isEditing => widget.attribute != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      _nameController.text = widget.attribute['name'];
+      _dataType = widget.attribute['data_type'];
+      _isFilterable = widget.attribute['is_filterable'];
+      if (_dataType == 'enum' && widget.attribute['options'] != null) {
+        _optionsController.text = (widget.attribute['options'] as List).join(', ');
+      }
+    } else {
+      _dataType = 'string';
+      _isFilterable = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _optionsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final data = {
+      'name': _nameController.text,
+      'data_type': _dataType,
+      'is_filterable': _isFilterable,
+      if (_dataType == 'enum') 'options': _optionsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+    };
+    try {
+      if (_isEditing) {
+        await ApiService.updatePropertyAttribute(widget.attribute['id'], data);
+      } else {
+        await ApiService.createPropertyAttribute(data);
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_isEditing ? 'Modifier l\'Attribut' : 'Ajouter un Attribut'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Nom de l\'attribut'), validator: (v) => v!.isEmpty ? 'Requis' : null),
+              DropdownButtonFormField<String>(
+                value: _dataType,
+                items: ['string', 'integer', 'boolean', 'enum'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                onChanged: (val) => setState(() => _dataType = val!),
+                decoration: const InputDecoration(labelText: 'Type de donnée'),
+              ),
+              if (_dataType == 'enum')
+                TextFormField(controller: _optionsController, decoration: const InputDecoration(labelText: 'Options (séparées par une virgule)'), validator: (v) => v!.isEmpty ? 'Requis pour enum' : null),
+              SwitchListTile(title: const Text('Utilisable comme filtre'), value: _isFilterable, onChanged: (val) => setState(() => _isFilterable = val)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(context).pop()),
+        ElevatedButton(child: const Text('Sauvegarder'), onPressed: _submit),
       ],
     );
   }

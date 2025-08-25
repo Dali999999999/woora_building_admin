@@ -337,6 +337,30 @@ class ApiService {
     }
   }
 
+  /// Met à jour un attribut de bien existant.
+  static Future<void> updatePropertyAttribute(int id, Map<String, dynamic> data) async {
+    if (_token == null) throw Exception('Authentification requise.');
+    final response = await http.put(
+      Uri.parse('$_baseUrl/admin/property_attributes/$id'),
+      headers: _getPostHeaders(),
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 200) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Erreur lors de la mise à jour de l\'attribut.');
+    }
+  }
+
+  /// Supprime un attribut de bien.
+  static Future<void> deletePropertyAttribute(int id) async {
+    if (_token == null) throw Exception('Authentification requise.');
+    final response = await http.delete(Uri.parse('$_baseUrl/admin/property_attributes/$id'), headers: _getGetHeaders());
+    if (response.statusCode != 204) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Erreur lors de la suppression de l\'attribut.');
+    }
+  }
+
   /// Met à jour les associations (scopes) entre un type et des attributs.
   static Future<void> updatePropertyTypeScopes(int typeId, List<int> attributeIds) async {
     if (_token == null) throw Exception('Authentification requise.');
