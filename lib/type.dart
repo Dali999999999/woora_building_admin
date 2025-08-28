@@ -65,7 +65,7 @@ class _PropertyConfigViewState extends State<PropertyConfigView> with SingleTick
   void _showAddAttributeDialog() {
     showDialog(
       context: context,
-      builder: (_) => const _AddEditAttributeDialog(), // Utilise le même dialogue pour l'ajout
+      builder: (_) => const _AddAttributeDialog(), // Utilise le même dialogue pour l'ajout
     ).then((success) {
       if (success == true) {
         _showSnackBar('Attribut créé avec succès !');
@@ -304,17 +304,60 @@ class _AddAttributeDialog extends StatefulWidget {
 class __AddAttributeDialogState extends State<_AddAttributeDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _optionsController = TextEditingController();
+  final List<TextEditingController> _optionControllers = [];
   String _dataType = 'string';
   bool _isFilterable = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Si on commence avec 'enum', on ajoute un champ vide
+    if (_dataType == 'enum' && _optionControllers.isEmpty) {
+      _addOptionField(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    for (var controller in _optionControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addOptionField({bool silent = false}) {
+    final action = () {
+      _optionControllers.add(TextEditingController());
+    };
+    silent ? action() : setState(action);
+  }
+
+  void _removeOptionField(int index) {
+    setState(() {
+      _optionControllers[index].dispose();
+      _optionControllers.removeAt(index);
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final options = _optionControllers
+        .map((c) => c.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (_dataType == 'enum' && options.length < _optionControllers.length) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez remplir toutes les options pour la liste de choix.'), backgroundColor: Colors.red));
+        return;
+    }
+
     final data = {
       'name': _nameController.text,
       'data_type': _dataType,
       'is_filterable': _isFilterable,
-      if (_dataType == 'enum') 'options': _optionsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+      if (_dataType == 'enum') 'options': options,
     };
     try {
       await ApiService.createPropertyAttribute(data);
@@ -330,21 +373,44 @@ class __AddAttributeDialogState extends State<_AddAttributeDialog> {
       title: const Text('Créer un nouvel Attribut'),
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Nom de l\'attribut'), validator: (v) => v!.isEmpty ? 'Requis' : null),
-              DropdownButtonFormField<String>(
-                value: _dataType,
-                items: ['string', 'integer', 'boolean', 'enum'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (val) => setState(() => _dataType = val!),
-                decoration: const InputDecoration(labelText: 'Type de donnée'),
-              ),
-              if (_dataType == 'enum')
-                TextFormField(controller: _optionsController, decoration: const InputDecoration(labelText: 'Options (séparées par une virgule)'), validator: (v) => v!.isEmpty ? 'Requis pour enum' : null),
-              SwitchListTile(title: const Text('Utilisable comme filtre'), value: _isFilterable, onChanged: (val) => setState(() => _isFilterable = val)),
-            ],
+        child: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: "Nom de l'attribut"), validator: (v) => v!.isEmpty ? 'Requis' : null),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _dataType,
+                  items: const [
+                    DropdownMenuItem(value: 'string', child: Text('Texte')),
+                    DropdownMenuItem(value: 'integer', child: Text('Nombre')),
+                    DropdownMenuItem(value: 'boolean', child: Text('Oui/Non (Case à cocher)')),
+                    DropdownMenuItem(value: 'enum', child: Text('Liste de choix')),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _dataType = val!;
+                      if (_dataType == 'enum' && _optionControllers.isEmpty) {
+                        _addOptionField();
+                      }
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Type de donnée', border: OutlineInputBorder()),
+                ),
+                if (_dataType == 'enum')
+                  _buildOptionsEditor(),
+                
+                SwitchListTile(
+                  title: const Text('Utilisable comme filtre'),
+                  value: _isFilterable,
+                  onChanged: (val) => setState(() => _isFilterable = val),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -354,7 +420,73 @@ class __AddAttributeDialogState extends State<_AddAttributeDialog> {
       ],
     );
   }
+
+  Widget _buildOptionsEditor() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16.0),
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Options de la liste',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const Divider(height: 20),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _optionControllers.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _optionControllers[index],
+                        decoration: InputDecoration(
+                          labelText: 'Option ${index + 1}',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        validator: (v) => (v == null || v.isEmpty) ? 'Requis' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_optionControllers.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        color: Colors.red.shade400,
+                        onPressed: () => _removeOptionField(index),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+              onPressed: _addOptionField,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 // --- DIALOGUE POUR GÉRER LES ASSOCIATIONS (SCOPES) ---
 class _ManageScopesDialog extends StatefulWidget {
@@ -406,8 +538,8 @@ class _ManageScopesDialogState extends State<_ManageScopesDialog> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) return Text('Erreur: ${snapshot.error}');
-            if (!snapshot.hasData || snapshot.data!.isEmpty) return const Text('Aucun attribut n\'a été créé.');
-            
+            if (!snapshot.hasData || snapshot.data!.isEmpty) return const Text("Aucun attribut n'a été créé.");
+
             final allAttributes = snapshot.data!;
             return ListView.builder(
               itemCount: allAttributes.length,
@@ -486,13 +618,13 @@ class _AttributeManagementViewState extends State<AttributeManagementView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Voulez-vous vraiment supprimer l\'attribut "$name" ?'),
+        content: Text("Voulez-vous vraiment supprimer l'attribut \"$name\" ?"),
         actions: [
           TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(ctx).pop()),
           TextButton(
             child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
             onPressed: () async {
-              Navigator.of(ctx).pop(); // Ferme le dialogue avant l\'appel API
+              Navigator.of(ctx).pop(); // Ferme le dialogue avant l\u0027appel API
               try {
                 await ApiService.deletePropertyAttribute(id);
                 _showSnackBar('Attribut supprimé avec succès.');
@@ -539,12 +671,12 @@ class _AttributeManagementViewState extends State<AttributeManagementView> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
-                        tooltip: 'Modifier l\'attribut',
+                        tooltip: "Modifier l'attribut",
                         onPressed: () => _showAddEditAttributeDialog(attribute: attr),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        tooltip: 'Supprimer l\'attribut',
+                        tooltip: "Supprimer l'attribut",
                         onPressed: () => _confirmDeleteAttribute(attr['id'], attr['name']),
                       ),
                     ],
@@ -571,7 +703,7 @@ class _AddEditAttributeDialog extends StatefulWidget {
 class __AddEditAttributeDialogState extends State<_AddEditAttributeDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _optionsController = TextEditingController();
+  final List<TextEditingController> _optionControllers = [];
   late String _dataType;
   late bool _isFilterable;
   bool get _isEditing => widget.attribute != null;
@@ -584,29 +716,65 @@ class __AddEditAttributeDialogState extends State<_AddEditAttributeDialog> {
       _dataType = widget.attribute['data_type'];
       _isFilterable = widget.attribute['is_filterable'];
       if (_dataType == 'enum' && widget.attribute['options'] != null) {
-        _optionsController.text = (widget.attribute['options'] as List).join(', ');
+        for (var option in (widget.attribute['options'] as List)) {
+          _optionControllers.add(TextEditingController(text: option.toString()));
+        }
       }
     } else {
       _dataType = 'string';
       _isFilterable = false;
+    }
+    if (_dataType == 'enum' && _optionControllers.isEmpty) {
+      _addOptionField(silent: true);
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _optionsController.dispose();
+    for (var controller in _optionControllers) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _addOptionField({bool silent = false}) {
+    final action = () {
+      _optionControllers.add(TextEditingController());
+    };
+    silent ? action() : setState(action);
+  }
+
+  void _removeOptionField(int index) {
+    // On ne peut pas supprimer le dernier champ
+    if (_optionControllers.length > 1) {
+      setState(() {
+        _optionControllers[index].dispose();
+        _optionControllers.removeAt(index);
+      });
+    }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final options = _optionControllers
+        .map((c) => c.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (_dataType == 'enum' && options.length < _optionControllers.length) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez remplir toutes les options pour la liste de choix.'), backgroundColor: Colors.red));
+        return;
+    }
+
     final data = {
       'name': _nameController.text,
       'data_type': _dataType,
       'is_filterable': _isFilterable,
-      if (_dataType == 'enum') 'options': _optionsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+      if (_dataType == 'enum') 'options': options,
     };
+
     try {
       if (_isEditing) {
         await ApiService.updatePropertyAttribute(widget.attribute['id'], data);
@@ -622,24 +790,47 @@ class __AddEditAttributeDialogState extends State<_AddEditAttributeDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(_isEditing ? 'Modifier l\'Attribut' : 'Ajouter un Attribut'),
+      title: Text(_isEditing ? 'Modifier l\u0027Attribut' : 'Ajouter un Attribut'),
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Nom de l\'attribut'), validator: (v) => v!.isEmpty ? 'Requis' : null),
-              DropdownButtonFormField<String>(
-                value: _dataType,
-                items: ['string', 'integer', 'boolean', 'enum'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                onChanged: (val) => setState(() => _dataType = val!),
-                decoration: const InputDecoration(labelText: 'Type de donnée'),
-              ),
-              if (_dataType == 'enum')
-                TextFormField(controller: _optionsController, decoration: const InputDecoration(labelText: 'Options (séparées par une virgule)'), validator: (v) => v!.isEmpty ? 'Requis pour enum' : null),
-              SwitchListTile(title: const Text('Utilisable comme filtre'), value: _isFilterable, onChanged: (val) => setState(() => _isFilterable = val)),
-            ],
+        child: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Nom de l\u0027attribut'), validator: (v) => v!.isEmpty ? 'Requis' : null),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _dataType,
+                  items: const [
+                    DropdownMenuItem(value: 'string', child: Text('Texte')),
+                    DropdownMenuItem(value: 'integer', child: Text('Nombre')),
+                    DropdownMenuItem(value: 'boolean', child: Text('Oui/Non (Case \u00E0 cocher)')),
+                    DropdownMenuItem(value: 'enum', child: Text('Liste de choix')),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _dataType = val!;
+                      if (_dataType == 'enum' && _optionControllers.isEmpty) {
+                        _addOptionField();
+                      }
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Type de donn\u00E9e', border: OutlineInputBorder()),
+                ),
+                if (_dataType == 'enum')
+                  _buildOptionsEditor(),
+                
+                SwitchListTile(
+                  title: const Text('Utilisable comme filtre'),
+                  value: _isFilterable,
+                  onChanged: (val) => setState(() => _isFilterable = val),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -647,6 +838,71 @@ class __AddEditAttributeDialogState extends State<_AddEditAttributeDialog> {
         TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(context).pop()),
         ElevatedButton(child: const Text('Sauvegarder'), onPressed: _submit),
       ],
+    );
+  }
+
+  Widget _buildOptionsEditor() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16.0),
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Options de la liste',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const Divider(height: 20),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _optionControllers.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _optionControllers[index],
+                        decoration: InputDecoration(
+                          labelText: 'Option ${index + 1}',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        validator: (v) => (v == null || v.isEmpty) ? 'Requis' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_optionControllers.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        color: Colors.red.shade400,
+                        onPressed: () => _removeOptionField(index),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+              onPressed: _addOptionField,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
