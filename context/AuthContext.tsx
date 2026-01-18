@@ -39,14 +39,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const logout = async () => {
         try {
-            // Optional: Call backend logout to clear cookies
-            // await authService.logout(); 
+            await authService.logout();
         } catch (e) {
-            console.error(e);
+            console.error('Logout error:', e);
         }
         setUser(null);
-        // Clear local storage if any legacy tokens remain
         localStorage.removeItem('jwt_token');
+
+        // Force hard redirect to ensure state is cleared
         window.location.href = '/login';
     };
 

@@ -71,6 +71,13 @@ export const authService = {
         const response = await client.get('/auth/profile');
         return response.data;
     },
+    logout: async () => {
+        try {
+            await client.post('/auth/logout');
+        } catch (error) {
+            // Ignore logout errors
+        }
+    },
 };
 
 export const userService = {
