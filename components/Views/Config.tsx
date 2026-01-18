@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, ToggleLeft, ToggleRight, Database, Edit2, Trash, Settings2 } from 'lucide-react';
+import { Layers, Plus, ToggleLeft, ToggleRight, Database, Edit2, Trash, Settings2, Check } from 'lucide-react';
 import { configService } from '../../api/services';
 import { PropertyType, PropertyAttribute } from '../../types';
 import toast from 'react-hot-toast';
+import AttributeModal from '../Modals/AttributeModal';
 
 const ConfigView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'types' | 'attributes'>('types');
   const [types, setTypes] = useState<any[]>([]);
   const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // State for Type Editing
   const [editingType, setEditingType] = useState<any | null>(null);
+
+  // State for Attribute Modal
+  const [isAttributeModalOpen, setIsAttributeModalOpen] = useState(false);
+  const [editingAttribute, setEditingAttribute] = useState<any | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -32,7 +39,10 @@ const ConfigView: React.FC = () => {
     }
   };
 
+  // --- TYPE MANAGEMENT ---
   const handleCreateType = async () => {
+    // Keep prompt for types for now, or create a TypeModal later if needed.
+    // The user request focused on Attributes management.
     const name = window.prompt("Nom du nouveau type de bien :");
     if (!name) return;
     try {
@@ -45,25 +55,8 @@ const ConfigView: React.FC = () => {
     }
   };
 
-  const handleCreateAttribute = async () => {
-    const name = window.prompt("Nom du nouvel attribut :");
-    if (!name) return;
-    const type = window.prompt("Type de donnée (string, integer, boolean, decimal) :", "string");
-    if (!type) return;
-
-    try {
-      await configService.createAttribute({ name, data_type: type, is_filterable: true });
-      toast.success("Attribut créé");
-      fetchConfig();
-    } catch (error) {
-      console.error(error);
-      toast.error("Erreur de création");
-    }
-  };
-
   const toggleAttributeForType = (typeId: number, attrId: number) => {
     if (!editingType) return;
-    // editingType.attributes is list of objects {id, name...}
     const currentAttrIds = editingType.attributes.map((a: any) => a.id);
     const hasAttr = currentAttrIds.includes(attrId);
 
@@ -74,7 +67,6 @@ const ConfigView: React.FC = () => {
       newAttrIds = [...currentAttrIds, attrId];
     }
 
-    // Optimistic update locally for UI
     const updatedType = {
       ...editingType,
       attributes: newAttrIds.map((id: number) => attributes.find(a => a.id === id))
@@ -96,15 +88,50 @@ const ConfigView: React.FC = () => {
     }
   };
 
+  // --- ATTRIBUTE MANAGEMENT ---
+  const openCreateAttributeModal = () => {
+    setEditingAttribute(null);
+    setIsAttributeModalOpen(true);
+  };
+
+  const openEditAttributeModal = (attr: any) => {
+    setEditingAttribute(attr);
+    setIsAttributeModalOpen(true);
+  };
+
+  const handleSaveAttribute = async (attributeData: any) => {
+    try {
+      if (editingAttribute) {
+        // UPDATE
+        await configService.updateAttribute(editingAttribute.id, attributeData);
+        toast.success("Attribut mis à jour");
+      } else {
+        // CREATE
+        await configService.createAttribute(attributeData);
+        toast.success("Attribut créé");
+      }
+      fetchConfig(); // Refresh list
+    } catch (error: any) {
+      // Error handling is done inside the modal for specific UI feedback,
+      // but we re-throw to allow modal to handle it if needed
+      console.error("Config save error:", error);
+      throw error;
+    }
+  };
+
   const handleDeleteAttribute = async (id: number) => {
-    if (!window.confirm("Supprimer cet attribut ? Cela l'enlèvera de tous les biens.")) return;
+    if (!window.confirm("Supprimer cet attribut ? \n\nATTENTION : S'il est utilisé par des biens, la suppression sera bloquée par le serveur.")) return;
     try {
       await configService.deleteAttribute(id);
       toast.success("Attribut supprimé");
       fetchConfig();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Erreur suppression");
+      if (e.response && e.response.status === 409) {
+        toast.error(e.response.data.message || "Impossible de supprimer : utilisé par des biens.", { duration: 5000 });
+      } else {
+        toast.error("Erreur suppression");
+      }
     }
   }
 
@@ -124,18 +151,19 @@ const ConfigView: React.FC = () => {
         <button
           onClick={() => { setActiveTab('types'); setEditingType(null); }}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium flex items-center transition-all ${activeTab === 'types'
-              ? 'bg-slate-800 text-white shadow'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+            ? 'bg-slate-800 text-white shadow'
+            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
             }`}
         >
           <Layers size={18} className="mr-2" />
           Types de Biens
         </button>
         <button
+          // Click on attributes tab clears type editing
           onClick={() => { setActiveTab('attributes'); setEditingType(null); }}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium flex items-center transition-all ${activeTab === 'attributes'
-              ? 'bg-slate-800 text-white shadow'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+            ? 'bg-slate-800 text-white shadow'
+            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
             }`}
         >
           <Database size={18} className="mr-2" />
@@ -153,33 +181,32 @@ const ConfigView: React.FC = () => {
               <div className="flex justify-end">
                 <button
                   onClick={handleCreateType}
-                  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center"
+                  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center shadow-indigo-100 shadow-md"
                 >
                   <Plus size={16} className="mr-1" /> Nouveau Type
                 </button>
               </div>
               {types.map(type => (
-                <div key={type.id} className={`bg-white rounded-xl shadow-sm border transition-all ${editingType?.id === type.id ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-200'}`}>
+                <div key={type.id} className={`bg-white rounded-xl shadow-sm border transition-all ${editingType?.id === type.id ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-md transform scale-[1.01]' : 'border-slate-200 hover:border-indigo-200'}`}>
                   <div className="p-5 flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-bold text-slate-800">{type.name}</h3>
-                        {/* Toggle active logic can be added later if backend supports simple toggle endpoint */}
                       </div>
-                      <p className="text-slate-500 text-sm mt-1">{type.description}</p>
+                      <p className="text-slate-500 text-sm mt-1">{type.description || 'Aucune description'}</p>
                       <div className="mt-4 flex flex-wrap gap-2">
                         {type.attributes && type.attributes.map((attr: any) => (
-                          <span key={attr.id} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">
+                          <span key={attr.id} className="bg-slate-50 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200">
                             {attr.name}
                           </span>
                         ))}
-                        {(!type.attributes || type.attributes.length === 0) && <span className="text-xs text-slate-400 italic">Aucun attribut spécifique</span>}
+                        {(!type.attributes || type.attributes.length === 0) && <span className="text-xs text-slate-400 italic">Aucun attribut spécifique associé</span>}
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setEditingType(type)}
-                        className={`p-2 rounded-lg transition-colors ${editingType?.id === type.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:bg-slate-50 hover:text-indigo-600'}`}
+                        className={`p-2 rounded-lg transition-colors ${editingType?.id === type.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'}`}
                       >
                         <Edit2 size={18} />
                       </button>
@@ -194,8 +221,8 @@ const ConfigView: React.FC = () => {
             <>
               <div className="flex justify-end">
                 <button
-                  onClick={handleCreateAttribute}
-                  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center"
+                  onClick={openCreateAttributeModal}
+                  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center shadow-indigo-100 shadow-md"
                 >
                   <Plus size={16} className="mr-1" /> Nouvel Attribut
                 </button>
@@ -212,28 +239,49 @@ const ConfigView: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {attributes.map(attr => (
-                      <tr key={attr.id} className="hover:bg-slate-50">
+                      <tr key={attr.id} className="hover:bg-slate-50 group transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-800">{attr.name}</td>
                         <td className="px-6 py-4">
-                          <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs uppercase font-bold tracking-wider">
+                          <span className={`px-2 py-1 rounded text-xs uppercase font-bold tracking-wider ${attr.data_type === 'enum' ? 'bg-purple-50 text-purple-700' :
+                            attr.data_type === 'boolean' ? 'bg-orange-50 text-orange-700' :
+                              attr.data_type === 'integer' || attr.data_type === 'decimal' ? 'bg-blue-50 text-blue-700' :
+                                'bg-slate-100 text-slate-700'
+                            }`}>
                             {attr.data_type}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           {attr.is_filterable
-                            ? <span className="text-emerald-600 flex items-center gap-1 text-xs font-bold"><Database size={12} /> Oui</span>
+                            ? <span className="text-emerald-600 flex items-center gap-1 text-xs font-bold"><Check size={14} strokeWidth={3} /> Oui</span>
                             : <span className="text-slate-400 text-xs">Non</span>}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleDeleteAttribute(attr.id)}
-                            className="text-slate-400 hover:text-rose-600 transition-colors"
-                          >
-                            <Trash size={16} />
-                          </button>
+                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => openEditAttributeModal(attr)}
+                              className="p-1.5 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
+                              title="Modifier"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAttribute(attr.id)}
+                              className="p-1.5 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
+                    {attributes.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-10 text-center text-slate-400">
+                          Aucun attribut configuré. Commencez par en créer un.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -241,69 +289,85 @@ const ConfigView: React.FC = () => {
           )}
         </div>
 
-        {/* Sidebar for Editing Context */}
+        {/* Sidebar for Editing Context (Types) */}
         <div className="space-y-4">
           {editingType && activeTab === 'types' ? (
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-indigo-200 sticky top-4 animate-in slide-in-from-right duration-300">
-              <div className="flex items-center gap-2 mb-4 text-indigo-700">
+            <div className="bg-white p-5 rounded-xl shadow-lg border border-indigo-200 sticky top-4 animate-in slide-in-from-right duration-300">
+              <div className="flex items-center gap-2 mb-4 text-indigo-700 pb-3 border-b border-indigo-50">
                 <Settings2 size={20} />
-                <h3 className="font-bold">Configurer: {editingType.name}</h3>
+                <h3 className="font-bold">Configuration: {editingType.name}</h3>
               </div>
 
               <div className="space-y-4">
-                {/* 
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Nom du type</label>
-                  <input type="text" value={editingType.name} readOnly className="w-full bg-slate-100 border border-slate-200 rounded px-3 py-2 text-sm text-slate-500" />
-                </div>
-                */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Associer des attributs</label>
-                  <p className="text-xs text-slate-400 mb-2">Cochez les attributs applicables à ce type de bien.</p>
-                  <div className="border border-slate-200 rounded-lg p-3 max-h-60 overflow-y-auto space-y-2 bg-slate-50">
+                  <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-in">Attributs associés</label>
+                  <p className="text-xs text-slate-400 mb-2">Quelles caractéristiques définissent ce type de bien ?</p>
+                  <div className="border border-slate-200 rounded-lg p-1 max-h-[60vh] overflow-y-auto space-y-0.5 bg-slate-50">
                     {attributes.map(attr => (
-                      <label key={attr.id} className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editingType.attributes.some((a: any) => a.id === attr.id)}
-                          onChange={() => toggleAttributeForType(editingType.id, attr.id)}
-                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-sm text-slate-700">{attr.name}</span>
+                      <label key={attr.id} className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer transition-colors group">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={editingType.attributes.some((a: any) => a.id === attr.id)}
+                            onChange={() => toggleAttributeForType(editingType.id, attr.id)}
+                            className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded checked:bg-indigo-600 checked:border-indigo-600 transition-colors"
+                          />
+                          <Check size={12} className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 pointer-events-none" strokeWidth={3} />
+                        </div>
+                        <span className="text-sm text-slate-700 font-medium group-hover:text-indigo-900">{attr.name}</span>
                       </label>
                     ))}
+                    {attributes.length === 0 && <p className="text-xs p-3 text-center text-slate-400">Créez d'abord des attributs dans l'onglet "Attributs Global"</p>}
                   </div>
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
                   <button
                     onClick={saveTypeScopes}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-indigo-200 shadow-sm transition-all"
                   >
                     Enregistrer
                   </button>
                   <button
                     onClick={() => setEditingType(null)}
-                    className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2 rounded-lg text-sm font-medium"
+                    className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 rounded-lg text-sm font-medium transition-colors"
                   >
-                    Annuler
+                    Fermer
                   </button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-100 text-indigo-800">
-              <h3 className="font-bold mb-2">Aide Rapide</h3>
-              <p className="text-sm opacity-80 mb-2">
-                Les attributs sont des caractéristiques réutilisables (ex: Piscine, Garage).
-              </p>
-              <p className="text-sm opacity-80">
-                Créez d'abord vos attributs, puis associez-les aux types de biens (Villa, Appartement) pour standardiser les annonces.
-              </p>
+            <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 text-indigo-900/80">
+              <div className="flex items-center gap-2 mb-3 text-indigo-700">
+                <Database size={20} />
+                <h3 className="font-bold">Guide Rapide</h3>
+              </div>
+              <div className="space-y-3 text-sm leading-relaxed">
+                <p>
+                  <strong className="text-indigo-800">1. Créez vos Attributs :</strong><br />
+                  Définissez les caractéristiques réutilisables (ex: Piscine, Garage, Climatisation) dans l'onglet "Attributs Global".
+                </p>
+                <div className="h-px bg-indigo-200/50 my-2"></div>
+                <p>
+                  <strong className="text-indigo-800">2. Configurez vos Types :</strong><br />
+                  Créez des types de biens (ex: Villa, Appartement) et cliquez sur <Edit2 size={12} className="inline" /> pour choisir quels attributs s'appliquent à chacun.
+                </p>
+                <div className="p-3 bg-white/60 rounded-lg text-xs mt-2 border border-indigo-100">
+                  💡 <em>Astuce : Un attribut "Piscine" peut être utilisé à la fois pour une Villa et un Hôtel.</em>
+                </div>
+              </div>
             </div>
           )}
         </div>
-
       </div>
+
+      {/* MODAL */}
+      <AttributeModal
+        isOpen={isAttributeModalOpen}
+        onClose={() => setIsAttributeModalOpen(false)}
+        onSave={handleSaveAttribute}
+        initialData={editingAttribute}
+      />
     </div>
   );
 };
