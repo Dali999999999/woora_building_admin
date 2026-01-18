@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, ToggleLeft, ToggleRight, Database, Edit2, Trash, Settings2, Check } from 'lucide-react';
+import { Layers, Plus, Database, Edit2, Trash, Settings2, Check, Pencil } from 'lucide-react';
 import { configService } from '../../api/services';
-import { PropertyType, PropertyAttribute } from '../../types';
 import toast from 'react-hot-toast';
 import AttributeModal from '../Modals/AttributeModal';
+import TypeModal from '../Modals/TypeModal';
 
 const ConfigView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'types' | 'attributes'>('types');
@@ -11,8 +11,12 @@ const ConfigView: React.FC = () => {
   const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // State for Type Editing
-  const [editingType, setEditingType] = useState<any | null>(null);
+  // State for Type Configuration (Associating Attributes)
+  const [configuringType, setConfiguringType] = useState<any | null>(null);
+
+  // State for Type Modal (Create/Edit Metadata)
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [editingTypeMetadata, setEditingTypeMetadata] = useState<any | null>(null);
 
   // State for Attribute Modal
   const [isAttributeModalOpen, setIsAttributeModalOpen] = useState(false);
@@ -40,24 +44,57 @@ const ConfigView: React.FC = () => {
   };
 
   // --- TYPE MANAGEMENT ---
-  const handleCreateType = async () => {
-    // Keep prompt for types for now, or create a TypeModal later if needed.
-    // The user request focused on Attributes management.
-    const name = window.prompt("Nom du nouveau type de bien :");
-    if (!name) return;
+  const openCreateTypeModal = () => {
+    setEditingTypeMetadata(null);
+    setIsTypeModalOpen(true);
+  };
+
+  const openEditTypeModal = (type: any, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening the config sidebar
+    setEditingTypeMetadata(type);
+    setIsTypeModalOpen(true);
+  };
+
+  const handleSaveType = async (typeData: any) => {
     try {
-      await configService.createPropertyType(name);
-      toast.success("Type créé");
+      if (editingTypeMetadata) {
+        // UPDATE
+        await configService.updatePropertyType(editingTypeMetadata.id, typeData);
+        toast.success("Type mis à jour");
+        // If we are currently configuring this type, update the sidebar title too
+        if (configuringType && configuringType.id === editingTypeMetadata.id) {
+          setConfiguringType((prev: any) => ({ ...prev, ...typeData }));
+        }
+      } else {
+        // CREATE
+        await configService.createPropertyType(typeData.name, typeData.description);
+        toast.success("Type créé");
+      }
       fetchConfig();
-    } catch (error) {
-      console.error(error);
-      toast.error("Erreur de création");
+    } catch (error: any) {
+      console.error("Config save error:", error);
+      throw error;
     }
   };
 
+  const handleDeleteType = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Supprimer ce type de bien ? \n\nLes biens existants de ce type devront être reclassés manually ou via une future migration.")) return;
+    try {
+      await configService.deletePropertyType(id);
+      toast.success("Type supprimé");
+      if (configuringType?.id === id) setConfiguringType(null);
+      fetchConfig();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erreur suppression");
+    }
+  }
+
+
   const toggleAttributeForType = (typeId: number, attrId: number) => {
-    if (!editingType) return;
-    const currentAttrIds = editingType.attributes.map((a: any) => a.id);
+    if (!configuringType) return;
+    const currentAttrIds = configuringType.attributes.map((a: any) => a.id);
     const hasAttr = currentAttrIds.includes(attrId);
 
     let newAttrIds;
@@ -67,20 +104,21 @@ const ConfigView: React.FC = () => {
       newAttrIds = [...currentAttrIds, attrId];
     }
 
+    // Optimistic update locally for UI
     const updatedType = {
-      ...editingType,
+      ...configuringType,
       attributes: newAttrIds.map((id: number) => attributes.find(a => a.id === id))
     };
-    setEditingType(updatedType);
+    setConfiguringType(updatedType);
   };
 
   const saveTypeScopes = async () => {
-    if (!editingType) return;
+    if (!configuringType) return;
     try {
-      const attrIds = editingType.attributes.map((a: any) => a.id);
-      await configService.updateTypeScopes(editingType.id, attrIds);
+      const attrIds = configuringType.attributes.map((a: any) => a.id);
+      await configService.updateTypeScopes(configuringType.id, attrIds);
       toast.success("Configuration sauvegardée");
-      setEditingType(null);
+      setConfiguringType(null);
       fetchConfig();
     } catch (error) {
       console.error(error);
@@ -112,8 +150,6 @@ const ConfigView: React.FC = () => {
       }
       fetchConfig(); // Refresh list
     } catch (error: any) {
-      // Error handling is done inside the modal for specific UI feedback,
-      // but we re-throw to allow modal to handle it if needed
       console.error("Config save error:", error);
       throw error;
     }
@@ -149,7 +185,7 @@ const ConfigView: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="bg-white p-1 rounded-xl border border-slate-200 inline-flex shadow-sm">
         <button
-          onClick={() => { setActiveTab('types'); setEditingType(null); }}
+          onClick={() => { setActiveTab('types'); setConfiguringType(null); }}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium flex items-center transition-all ${activeTab === 'types'
             ? 'bg-slate-800 text-white shadow'
             : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -160,7 +196,7 @@ const ConfigView: React.FC = () => {
         </button>
         <button
           // Click on attributes tab clears type editing
-          onClick={() => { setActiveTab('attributes'); setEditingType(null); }}
+          onClick={() => { setActiveTab('attributes'); setConfiguringType(null); }}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium flex items-center transition-all ${activeTab === 'attributes'
             ? 'bg-slate-800 text-white shadow'
             : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -180,14 +216,18 @@ const ConfigView: React.FC = () => {
             <>
               <div className="flex justify-end">
                 <button
-                  onClick={handleCreateType}
+                  onClick={openCreateTypeModal}
                   className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center shadow-indigo-100 shadow-md"
                 >
                   <Plus size={16} className="mr-1" /> Nouveau Type
                 </button>
               </div>
               {types.map(type => (
-                <div key={type.id} className={`bg-white rounded-xl shadow-sm border transition-all ${editingType?.id === type.id ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-md transform scale-[1.01]' : 'border-slate-200 hover:border-indigo-200'}`}>
+                <div
+                  key={type.id}
+                  onClick={() => setConfiguringType(type)}
+                  className={`bg-white rounded-xl shadow-sm border transition-all cursor-pointer ${configuringType?.id === type.id ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-md transform scale-[1.01]' : 'border-slate-200 hover:border-indigo-300'}`}
+                >
                   <div className="p-5 flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-3">
@@ -205,11 +245,26 @@ const ConfigView: React.FC = () => {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setEditingType(type)}
-                        className={`p-2 rounded-lg transition-colors ${editingType?.id === type.id ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                        onClick={(e) => openEditTypeModal(type, e)}
+                        className="p-2 rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        title="Modifier nom/description"
                       >
-                        <Edit2 size={18} />
+                        <Pencil size={18} />
                       </button>
+                      <button
+                        onClick={(e) => handleDeleteType(type.id, e)}
+                        className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                        title="Supprimer le type"
+                      >
+                        <Trash size={18} />
+                      </button>
+                      {configuringType?.id !== type.id && (
+                        <button
+                          className="p-2 rounded-lg text-indigo-600 bg-indigo-50 font-medium text-xs self-center ml-2"
+                        >
+                          Configurer
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -243,9 +298,9 @@ const ConfigView: React.FC = () => {
                         <td className="px-6 py-4 font-medium text-slate-800">{attr.name}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded text-xs uppercase font-bold tracking-wider ${attr.data_type === 'enum' ? 'bg-purple-50 text-purple-700' :
-                            attr.data_type === 'boolean' ? 'bg-orange-50 text-orange-700' :
-                              attr.data_type === 'integer' || attr.data_type === 'decimal' ? 'bg-blue-50 text-blue-700' :
-                                'bg-slate-100 text-slate-700'
+                              attr.data_type === 'boolean' ? 'bg-orange-50 text-orange-700' :
+                                attr.data_type === 'integer' || attr.data_type === 'decimal' ? 'bg-blue-50 text-blue-700' :
+                                  'bg-slate-100 text-slate-700'
                             }`}>
                             {attr.data_type}
                           </span>
@@ -291,11 +346,11 @@ const ConfigView: React.FC = () => {
 
         {/* Sidebar for Editing Context (Types) */}
         <div className="space-y-4">
-          {editingType && activeTab === 'types' ? (
+          {configuringType && activeTab === 'types' ? (
             <div className="bg-white p-5 rounded-xl shadow-lg border border-indigo-200 sticky top-4 animate-in slide-in-from-right duration-300">
               <div className="flex items-center gap-2 mb-4 text-indigo-700 pb-3 border-b border-indigo-50">
                 <Settings2 size={20} />
-                <h3 className="font-bold">Configuration: {editingType.name}</h3>
+                <h3 className="font-bold">Configuration: {configuringType.name}</h3>
               </div>
 
               <div className="space-y-4">
@@ -308,8 +363,8 @@ const ConfigView: React.FC = () => {
                         <div className="relative flex items-center">
                           <input
                             type="checkbox"
-                            checked={editingType.attributes.some((a: any) => a.id === attr.id)}
-                            onChange={() => toggleAttributeForType(editingType.id, attr.id)}
+                            checked={configuringType.attributes.some((a: any) => a.id === attr.id)}
+                            onChange={() => toggleAttributeForType(configuringType.id, attr.id)}
                             className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded checked:bg-indigo-600 checked:border-indigo-600 transition-colors"
                           />
                           <Check size={12} className="absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100 pointer-events-none" strokeWidth={3} />
@@ -328,7 +383,7 @@ const ConfigView: React.FC = () => {
                     Enregistrer
                   </button>
                   <button
-                    onClick={() => setEditingType(null)}
+                    onClick={() => setConfiguringType(null)}
                     className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-2.5 rounded-lg text-sm font-medium transition-colors"
                   >
                     Fermer
@@ -361,12 +416,19 @@ const ConfigView: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* MODALS */}
       <AttributeModal
         isOpen={isAttributeModalOpen}
         onClose={() => setIsAttributeModalOpen(false)}
         onSave={handleSaveAttribute}
         initialData={editingAttribute}
+      />
+
+      <TypeModal
+        isOpen={isTypeModalOpen}
+        onClose={() => setIsTypeModalOpen(false)}
+        onSave={handleSaveType}
+        initialData={editingTypeMetadata}
       />
     </div>
   );
