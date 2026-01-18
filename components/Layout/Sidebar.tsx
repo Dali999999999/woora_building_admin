@@ -23,7 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
     <>
       {/* Mobile Overlay with Blur */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden transition-opacity duration-300"
           onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
       )}
 
       {/* Sidebar Container */}
-      <aside 
+      <aside
         className={`
           fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -60,8 +60,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
                 }}
                 className={`
                   flex items-center w-full px-4 py-3 rounded-lg transition-all duration-200 group
-                  ${isActive 
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20' 
+                  ${isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
                 `}
               >
@@ -72,13 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
           })}
         </nav>
 
-        {/* Fixed Footer */}
-        <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900">
-          <button className="flex items-center w-full p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-            <LogOut size={20} className="mr-3" />
-            <span className="font-medium text-sm">Déconnexion</span>
-          </button>
-        </div>
+        {/* Fixed Footer Removed as per request */}
       </aside>
     </>
   );
