@@ -282,8 +282,8 @@ const ConfigView: React.FC = () => {
                   <Plus size={16} className="mr-1" /> Nouvel Attribut
                 </button>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left text-sm">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[600px]">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-4 font-medium text-slate-500">Nom Attribut</th>
@@ -298,9 +298,9 @@ const ConfigView: React.FC = () => {
                         <td className="px-6 py-4 font-medium text-slate-800">{attr.name}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded text-xs uppercase font-bold tracking-wider ${attr.data_type === 'enum' ? 'bg-purple-50 text-purple-700' :
-                              attr.data_type === 'boolean' ? 'bg-orange-50 text-orange-700' :
-                                attr.data_type === 'integer' || attr.data_type === 'decimal' ? 'bg-blue-50 text-blue-700' :
-                                  'bg-slate-100 text-slate-700'
+                            attr.data_type === 'boolean' ? 'bg-orange-50 text-orange-700' :
+                              attr.data_type === 'integer' || attr.data_type === 'decimal' ? 'bg-blue-50 text-blue-700' :
+                                'bg-slate-100 text-slate-700'
                             }`}>
                             {attr.data_type}
                           </span>
@@ -311,7 +311,7 @@ const ConfigView: React.FC = () => {
                             : <span className="text-slate-400 text-xs">Non</span>}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end gap-2">
                             <button
                               onClick={() => openEditAttributeModal(attr)}
                               className="p-1.5 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
