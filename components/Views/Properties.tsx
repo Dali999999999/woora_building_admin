@@ -71,24 +71,26 @@ const PropertiesView: React.FC = () => {
   });
 
   const handleValidate = async (id: number) => {
+    const promise = propertyService.validateProperty(id);
+
+    toast.promise(promise, {
+      loading: 'Validation en cours...',
+      success: 'Bien validé et publié ! 🚀',
+      error: 'Erreur lors de la validation',
+    });
+
     try {
-      if (confirm("Valider ce bien pour le rendre public ?")) {
-        await propertyService.validateProperty(id);
-        toast.success("Bien validé et publié avec succès !");
+      await promise;
+      // Refresh local state
+      setProperties(props => props.map(p =>
+        p.id === id ? { ...p, is_validated: true } : p
+      ));
 
-        // Refresh local state to reflect change immediately without refetch
-        setProperties(props => props.map(p =>
-          p.id === id ? { ...p, is_validated: true } : p
-        ));
-
-        if (selectedProperty?.id === id) {
-          setSelectedProperty(prev => prev ? { ...prev, is_validated: true } : null);
-        }
-        // Optionally close modal if validating from there, or keep open to show status change
+      if (selectedProperty?.id === id) {
+        setSelectedProperty(prev => prev ? { ...prev, is_validated: true } : null);
       }
     } catch (error) {
       console.error(error);
-      toast.error("Erreur lors de la validation");
     }
   };
 
