@@ -40,8 +40,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
       >
         {/* Logo Area */}
         <div className="flex items-center justify-center h-16 shrink-0 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
-          <h1 className="text-2xl font-bold tracking-wider text-white">
-            IMMO<span className="text-indigo-500">PRO</span>
+          <h1 className="text-xl font-bold tracking-wider text-white">
+            PROFESSIONNEL
           </h1>
         </div>
 

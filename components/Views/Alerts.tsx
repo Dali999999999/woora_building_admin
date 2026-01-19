@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, Check, Trash2 } from 'lucide-react';
+import { Bell, Mail, Check, Phone, User, MapPin, Tag, Calendar, ChevronRight } from 'lucide-react';
 import { requestService } from '../../api/services';
 import toast from 'react-hot-toast';
 
+interface Customer {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string;
+  profile_image_url?: string;
+}
+
+interface Alert {
+  id: number;
+  request_details: string; // JSON string
+  city: string;
+  min_price: number;
+  max_price: number;
+  status: 'new' | 'contacted' | 'closed';
+  created_at: string;
+  customer: Customer | null;
+  property_type_name: string;
+}
+
 const AlertsView: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'new' | 'contacted'>('all');
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,105 +52,179 @@ const AlertsView: React.FC = () => {
 
     try {
       await requestService.respond(id, message);
-      toast.success("Réponse envoyée");
+      toast.success("Statut mis à jour");
       fetchAlerts();
     } catch (error) {
       console.error(error);
-      toast.error("Erreur lors de l'envoi");
+      toast.error("Erreur lors de la mise à jour");
     }
   };
 
   const filteredAlerts = alerts.filter(a => filter === 'all' || a.status === filter);
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Chargement des alertes...</div>;
+  // Parse details helper
+  const renderDetails = (detailsJson: string) => {
+    try {
+      const details = JSON.parse(detailsJson);
+      return (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {Object.entries(details).map(([key, value]) => {
+            if (key === 'city' || key === 'min_price' || key === 'max_price') return null;
+            if (!value || value === 'Indifférent') return null;
+
+            // Format Label
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+            return (
+              <span key={key} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="opacity-60 mr-1">{label}:</span> {String(value)}
+              </span>
+            );
+          })}
+        </div>
+      );
+    } catch (e) {
+      return <span className="text-sm text-slate-400 italic">Détails non disponibles</span>;
+    }
+  };
+
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Alertes Immo</h2>
-          <p className="text-slate-500">Besoins exprimés par les utilisateurs non satisfaits.</p>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Alertes Clients</h2>
+          <p className="text-slate-500">Demandes spécifiques et recherches enregistrées.</p>
         </div>
       </div>
 
-      <div className="flex gap-4 border-b border-slate-200 pb-1">
-        <button
-          onClick={() => setFilter('all')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors ${filter === 'all' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Toutes
-        </button>
-        <button
-          onClick={() => setFilter('new')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors ${filter === 'new' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Nouvelles
-        </button>
-        <button
-          onClick={() => setFilter('contacted')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors ${filter === 'contacted' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
-        >
-          Traitées
-        </button>
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {(['all', 'new', 'contacted'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${filter === f
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+              }`}
+          >
+            {f === 'all' ? 'Toutes' : f === 'new' ? 'Nouvelles' : 'Traitées'}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4">
         {filteredAlerts.length === 0 ? (
-          <div className="py-12 text-center text-slate-400">Aucune alerte trouvée.</div>
-        ) : filteredAlerts.map(alert => {
-          // Identify fields based on backend
-          // Backend: PropertyRequest(request_details, city, min_price, max_price, status, created_at, customer_id)
-          // to_dict includes customer relationship or at least ID.
-          // Services.ts: getAll -> list.
-          // Need to verify if backend returns user info.
-          // app/admin/routes.py: get_all_property_requests returns [req.to_dict() for req in requests]
-          // PropertyRequest.to_dict (models.py) does NOT include customer details, only customer_id.
-          // This is a limitation. I should update backend or fetch user separately.
-          // But fetching individual users for a list is N+1.
+          <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-300">
+            <Bell className="mx-auto h-12 w-12 text-slate-300 mb-4" />
+            <p className="text-slate-500 font-medium">Aucune alerte pour le moment.</p>
+          </div>
+        ) : filteredAlerts.map(alert => (
+          <div key={alert.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200 group">
+            <div className="p-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Status Strip */}
+                <div className={`w-1.5 self-stretch rounded-full ${alert.status === 'new' ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
 
-          // I'll display what I have. If customer info is missing, just show ID or "Client".
-          // The user said "make it functional", so I should probably fix the backend to includes customer info in list.
-          // I will assume for now I can just display the request details which is the important part.
-          // Or I check if 'to_dict' in `models.py` for PropertyRequest includes customer.
-          // I checked models.py line 256. It does NOT include customer dict.
-
-          return (
-            <div key={alert.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start gap-4 hover:border-indigo-200 transition-colors">
-              <div className={`p-3 rounded-full shrink-0 ${alert.status === 'new' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
-                <Bell size={24} />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-semibold text-slate-800 text-lg">
-                    {alert.request_details ? `"${alert.request_details}"` : `Recherche à ${alert.city}`}
-                  </h4>
-                  <span className="text-xs text-slate-400">{alert.created_at ? new Date(alert.created_at).toLocaleDateString() : ''}</span>
+                {/* Customer Info */}
+                <div className="w-full md:w-64 shrink-0 flex flex-row md:flex-col gap-4 items-center md:items-start border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-4">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-lg shrink-0 overflow-hidden">
+                    {alert.customer?.profile_image_url ? (
+                      <img src={alert.customer.profile_image_url} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      (alert.customer?.first_name?.[0] || 'C').toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-slate-800 truncate">
+                      {alert.customer ? `${alert.customer.first_name} ${alert.customer.last_name}` : `Client #${alert.customer_id || '?'}`}
+                    </h4>
+                    {alert.customer && (
+                      <div className="space-y-1 mt-1">
+                        <div className="flex items-center text-xs text-slate-500">
+                          <Mail size={12} className="mr-1.5" />
+                          <span className="truncate">{alert.customer.email}</span>
+                        </div>
+                        {alert.customer.phone_number && (
+                          <div className="flex items-center text-xs text-slate-500">
+                            <Phone size={12} className="mr-1.5" />
+                            <span>{alert.customer.phone_number}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {alert.city && <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">📍 {alert.city}</span>}
-                  {alert.min_price && <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">Min: {alert.min_price}</span>}
-                  {alert.max_price && <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">Max: {alert.max_price}</span>}
+                {/* Alert Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 uppercase tracking-wide">
+                          {alert.property_type_name || 'Recherche'}
+                        </span>
+                        <span className="text-xs text-slate-400 flex items-center">
+                          <Calendar size={12} className="mr-1" />
+                          {new Date(alert.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <h3 className="text-lg font-bold text-slate-800">
+                          Recherche à {alert.city || 'Toutes zones'}
+                        </h3>
+                      </div>
+                    </div>
+                    {alert.status === 'new' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 animate-pulse">
+                        Nouvelle
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Budget & Specs */}
+                  <div className="flex flex-wrap gap-4 mb-4 text-sm text-slate-600">
+                    <div className="flex items-center bg-slate-50 px-3 py-1.5 rounded-lg">
+                      <Tag size={16} className="text-slate-400 mr-2" />
+                      <span>Budget: </span>
+                      <span className="font-semibold text-slate-900 ml-1">
+                        {alert.min_price ? Number(alert.min_price).toLocaleString() : '0'}
+                        {' - '}
+                        {alert.max_price ? Number(alert.max_price).toLocaleString() : '∞'} FCFA
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Attributes */}
+                  <div>
+                    {renderDetails(alert.request_details)}
+                  </div>
                 </div>
 
-                <div className="flex items-center text-sm text-slate-500 mb-4">
-                  <span className="font-medium mr-2">Client ID:</span>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">#{alert.customer_id}</span>
-                </div>
-
-                <div className="flex gap-3 mt-4">
+                {/* Actions */}
+                <div className="flex md:flex-col justify-end gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-4">
                   <button
                     onClick={() => handleRespond(alert.id)}
-                    className="flex items-center text-sm text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors font-medium"
+                    className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm whitespace-nowrap"
                   >
                     <Mail size={16} className="mr-2" />
-                    Répondre / Proposer
+                    Contacter
+                  </button>
+                  <button
+                    className="flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
