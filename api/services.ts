@@ -119,6 +119,10 @@ export const propertyService = {
         });
         return response.data;
     },
+    validateProperty: async (propertyId: number) => {
+        const response = await client.put(`/admin/properties/${propertyId}/validate`);
+        return response.data;
+    },
 };
 
 export const visitService = {
