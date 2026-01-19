@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Edit, Trash2, Eye, Filter, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Edit, Trash2, Eye, Filter, CheckCircle, AlertCircle, Ban } from 'lucide-react';
 import { propertyService, configService } from '../../api/services';
 import { Property, PropertyType } from '../../types';
 import toast from 'react-hot-toast';
 import PropertyDetailsModal from '../Modals/PropertyDetailsModal';
+import ReasonModal from '../Modals/ReasonModal';
 
 const PropertiesView: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -19,6 +20,10 @@ const PropertiesView: React.FC = () => {
   // Modal State
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Invalidation State
+  const [propertyToInvalidate, setPropertyToInvalidate] = useState<Property | null>(null);
+  const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -93,6 +98,37 @@ const PropertiesView: React.FC = () => {
       console.error(error);
     }
   };
+
+  const triggerInvalidation = (property: Property) => {
+    setPropertyToInvalidate(property);
+    setIsReasonModalOpen(true);
+  };
+
+  const confirmInvalidation = async (reason: string) => {
+    if (!propertyToInvalidate) return;
+
+    const promise = propertyService.invalidateProperty(propertyToInvalidate.id, reason);
+
+    toast.promise(promise, {
+      loading: 'Suspension en cours...',
+      success: 'Bien retiré de la publication.',
+      error: 'Erreur lors de la suspension'
+    });
+
+    try {
+      await promise;
+      setProperties(props => props.map(p =>
+        p.id === propertyToInvalidate.id ? { ...p, is_validated: false } : p
+      ));
+
+      if (selectedProperty?.id === propertyToInvalidate.id) {
+        setSelectedProperty(prev => prev ? { ...prev, is_validated: false } : null);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
 
   const openDetails = (property: Property) => {
     setSelectedProperty(property);
@@ -263,13 +299,21 @@ const PropertiesView: React.FC = () => {
                   </div>
 
                   <div className="flex gap-1">
-                    {!p.is_validated && (
+                    {!p.is_validated ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleValidate(property.id); }}
                         className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
-                        title="Valider rapidement"
+                        title="Valider maintenant"
                       >
                         <CheckCircle size={18} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); triggerInvalidation(property); }}
+                        className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Invalider / Suspendre"
+                      >
+                        <Ban size={18} />
                       </button>
                     )}
                     <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
@@ -303,6 +347,14 @@ const PropertiesView: React.FC = () => {
         property={selectedProperty}
         onValidate={handleValidate}
         onDelete={() => toast('Suppression à implémenter', { icon: '🗑️' })}
+      />
+
+      <ReasonModal
+        isOpen={isReasonModalOpen}
+        onClose={() => setIsReasonModalOpen(false)}
+        onConfirm={confirmInvalidation}
+        title="Invalider / Retirer le bien"
+        description="Ce bien repassera en 'non validé' et ne sera plus visible. Vous pouvez indiquer une raison pour le propriétaire."
       />
 
     </div>

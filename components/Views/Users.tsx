@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Filter, MoreVertical, Shield, ShieldOff, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, MoreVertical, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { userService } from '../../api/services';
 import type { User } from '../../api/services';
 import toast from 'react-hot-toast';
+import ReasonModal from '../Modals/ReasonModal'; // Import ReasonModal
 
 const UsersView: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -18,7 +19,11 @@ const UsersView: React.FC = () => {
   const [filterRole, setFilterRole] = useState<'all' | 'owner' | 'agent' | 'customer'>('all');
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false); // Renamed for clarity
+
+  // Delete State
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Debounce search term
   useEffect(() => {
@@ -38,14 +43,11 @@ const UsersView: React.FC = () => {
     setLoading(true);
     try {
       const data = await userService.getUsers(page, limit, debouncedSearch, filterRole);
-      // Safeguard against missing data
       if (Array.isArray(data)) {
-        // Legacy API response (just an array of users)
         setUsers(data);
         setTotalPages(1);
         setTotalUsers(data.length);
       } else if (data && Array.isArray(data.users)) {
-        // New Paginated API response
         setUsers(data.users);
         setTotalPages(data.pages || 1);
         setTotalUsers(data.total || 0);
@@ -66,38 +68,36 @@ const UsersView: React.FC = () => {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleSuspend = async (user: User) => {
-    const reason = window.prompt(`Raison de la suspension pour ${user.first_name} :`);
-    if (!reason) return;
+  const handleDeleteClick = (e: React.MouseEvent, user: User) => {
+    e.stopPropagation(); // Prevent row click
+    setUserToDelete(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async (reason: string) => {
+    if (!userToDelete) return;
+
+    const promise = userService.deleteUser(userToDelete.id, reason);
+
+    toast.promise(promise, {
+      loading: 'Suppression en cours...',
+      success: 'Utilisateur supprimé (Soft Delete) avec succès.',
+      error: 'Erreur lors de la suppression.'
+    });
 
     try {
-      await userService.suspendUser(user.id, reason);
-      toast.success("Utilisateur suspendu avec succès");
+      await promise;
       fetchUsers();
-      setShowModal(false);
+      setIsDeleteModalOpen(false);
+      setShowDetailModal(false); // Also close detail modal if open
     } catch (error) {
       console.error(error);
-      toast.error("Erreur lors de la suspension");
     }
   };
 
-  const handleUnsuspend = async (user: User) => {
-    if (!window.confirm(`Voulez-vous réactiver le compte de ${user.first_name} ?`)) return;
-
-    try {
-      await userService.unsuspendUser(user.id);
-      toast.success("Utilisateur réactivé");
-      fetchUsers();
-      setShowModal(false);
-    } catch (error) {
-      console.error(error);
-      toast.error("Erreur lors de la réactivation");
-    }
-  }
 
   // Memoize empty state or content to avoid flickering
   const content = useMemo(() => {
-    // Ensure users is an array
     const safeUsers = Array.isArray(users) ? users : [];
 
     if (loading && safeUsers.length === 0) {
@@ -131,7 +131,7 @@ const UsersView: React.FC = () => {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {users.map(user => (
-            <tr key={user.id} className={`group hover:bg-slate-50 cursor-pointer transition-colors ${user.is_suspended ? 'bg-red-50 hover:bg-red-100' : ''}`} onClick={() => { setSelectedUser(user); setShowModal(true); }}>
+            <tr key={user.id} className="group hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => { setSelectedUser(user); setShowDetailModal(true); }}>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
@@ -158,25 +158,22 @@ const UsersView: React.FC = () => {
                 </span>
               </td>
               <td className="px-6 py-4">
-                {user.is_suspended ? (
-                  <span className="inline-flex items-center gap-1 text-red-600 bg-red-100 px-2 py-1 rounded-md text-xs font-bold ring-1 ring-red-200">
-                    <ShieldOff size={12} />
-                    Suspendu
-                  </span>
+                {user.is_verified ? (
+                  <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-emerald-200">Vérifié</span>
                 ) : (
-                  user.is_verified ? (
-                    <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-emerald-200">Vérifié</span>
-                  ) : (
-                    <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-amber-200">Non vérifié</span>
-                  )
+                  <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-amber-200">Non vérifié</span>
                 )}
               </td>
               <td className="px-6 py-4 text-slate-600 text-sm font-mono">
                 {new Date(user.created_at).toLocaleDateString()}
               </td>
               <td className="px-6 py-4 text-right">
-                <button className="text-slate-400 hover:text-indigo-600 p-2 rounded-full hover:bg-slate-100 transition-colors">
-                  <MoreVertical size={18} />
+                <button
+                  onClick={(e) => handleDeleteClick(e, user)}
+                  className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
+                  title="Supprimer l'utilisateur"
+                >
+                  <Trash2 size={16} />
                 </button>
               </td>
             </tr>
@@ -223,7 +220,6 @@ const UsersView: React.FC = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {content}
-
         {/* Pagination Controls */}
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
           <div className="text-sm text-slate-500">
@@ -252,13 +248,13 @@ const UsersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Detail & Actions */}
-      {showModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+      {/* Detail Modal */}
+      {showDetailModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
               <h3 className="text-xl font-bold text-slate-800">Détails Utilisateur</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+              <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
             </div>
             <div className="p-6 space-y-6">
               <div className="flex items-center gap-5">
@@ -280,16 +276,6 @@ const UsersView: React.FC = () => {
                 </div>
               </div>
 
-              {selectedUser.is_suspended && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800 flex items-start gap-3">
-                  <ShieldOff className="shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <strong className="block mb-1">Compte suspendu</strong>
-                    <p className="opacity-90">{selectedUser.suspension_reason}</p>
-                  </div>
-                </div>
-              )}
-
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="block text-xs text-slate-400 uppercase font-bold mb-1 tracking-wider">Statut du compte</span>
@@ -304,23 +290,15 @@ const UsersView: React.FC = () => {
               </div>
             </div>
             <div className="p-5 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              {selectedUser.is_suspended ? (
-                <button
-                  onClick={() => handleUnsuspend(selectedUser)}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
-                >
-                  <Shield size={16} className="mr-2" /> Réactiver le compte
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleSuspend(selectedUser)}
-                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
-                >
-                  <ShieldOff size={16} className="mr-2" /> Suspendre le compte
-                </button>
-              )}
               <button
-                onClick={() => setShowModal(false)}
+                onClick={(e) => handleDeleteClick(e, selectedUser)}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+              >
+                <Trash2 size={16} className="mr-2" /> Supprimer le compte
+              </button>
+
+              <button
+                onClick={() => setShowDetailModal(false)}
                 className="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
               >
                 Fermer
@@ -329,6 +307,18 @@ const UsersView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ReasonModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Supprimer l'utilisateur ?"
+        description="ATTENTION : Cette action est irréversible (Soft Delete). L'utilisateur ne pourra plus se connecter et ses biens seront masqués. Un email de notification sera envoyé."
+        label="Motif de la suppression (Optionnel)"
+        confirmLabel="Supprimer définitivement"
+        isDanger={true}
+      />
     </div>
   );
 };

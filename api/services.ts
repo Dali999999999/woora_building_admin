@@ -100,6 +100,13 @@ export const userService = {
         const response = await client.put(`/admin/users/${id}/unsuspend`);
         return response.data;
     },
+    deleteUser: async (id: number, reason?: string) => {
+        // DELETE with body is supported by axios but requires `data` property
+        const response = await client.delete(`/admin/users/${id}`, {
+            data: { reason }
+        });
+        return response.data;
+    },
 };
 
 export const propertyService = {
@@ -121,6 +128,10 @@ export const propertyService = {
     },
     validateProperty: async (propertyId: number) => {
         const response = await client.put(`/admin/properties/${propertyId}/validate`);
+        return response.data;
+    },
+    invalidateProperty: async (propertyId: number, reason?: string) => {
+        const response = await client.put(`/admin/properties/${propertyId}/invalidate`, { reason });
         return response.data;
     },
 };
