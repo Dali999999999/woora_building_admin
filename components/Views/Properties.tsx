@@ -342,6 +342,13 @@ const PropertiesView: React.FC = () => {
                     )}
 
                     <button
+                      className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Modifier le bien"
+                    >
+                      <Edit size={18} />
+                    </button>
+
+                    <button
                       onClick={(e) => { e.stopPropagation(); triggerDelete(property); }}
                       className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                       title="Supprimer (Soft Delete)"
