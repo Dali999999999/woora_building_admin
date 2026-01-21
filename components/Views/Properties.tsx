@@ -25,6 +25,10 @@ const PropertiesView: React.FC = () => {
   const [propertyToInvalidate, setPropertyToInvalidate] = useState<Property | null>(null);
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
 
+  // Delete State
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -52,11 +56,6 @@ const PropertiesView: React.FC = () => {
   const filteredProperties = properties.filter(p => {
     // Tab Filter
     if (activeTab === 'pending' && p.is_validated) return false;
-    // Note: 'all' tab shows everything, or maybe strictly 'validated'? 
-    // Usually 'All' implies everything, but let's make 'all' = 'Validated' + 'Pending' 
-    // or maybe separate 'Validated' and 'Pending'.
-    // User asked for a "Pending Validation Section". 
-    // Let's assume 'all' shows everything, 'pending' shows only pending.
 
     // Search
     const location = `${p.attributes?.address || ''} ${p.attributes?.city || ''}`.toLowerCase();
@@ -64,8 +63,7 @@ const PropertiesView: React.FC = () => {
     const matchesSearch = titleMatch || location.includes(searchTerm.toLowerCase());
 
     // Type Filter
-    const typeId = p.type?.id; // Assumes backend populates this or we handle it
-    // Check if property_type_id exists on p (root) or p.attributes
+    const typeId = p.type?.id;
     const pTypeId = (p as any).property_type_id || p.type?.id;
     const matchesType = typeFilter === 'all' || (pTypeId && pTypeId.toString() === typeFilter);
 
@@ -124,6 +122,32 @@ const PropertiesView: React.FC = () => {
       if (selectedProperty?.id === propertyToInvalidate.id) {
         setSelectedProperty(prev => prev ? { ...prev, is_validated: false } : null);
       }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const triggerDelete = (property: Property) => {
+    setPropertyToDelete(property);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async (reason: string) => {
+    if (!propertyToDelete) return;
+
+    const promise = propertyService.deleteProperty(propertyToDelete.id, reason);
+
+    toast.promise(promise, {
+      loading: 'Suppression en cours...',
+      success: 'Bien supprimé definitivement. (Soft Delete)',
+      error: 'Erreur lors de la suppression'
+    });
+
+    try {
+      await promise;
+      setProperties(props => props.filter(p => p.id !== propertyToDelete.id)); // Remove from list
+      setIsDeleteModalOpen(false);
+      setIsDetailModalOpen(false); // Close details if open
     } catch (error) {
       console.error(error);
     }
@@ -316,8 +340,13 @@ const PropertiesView: React.FC = () => {
                         <Ban size={18} />
                       </button>
                     )}
-                    <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                      <Edit size={18} />
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); triggerDelete(property); }}
+                      className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Supprimer (Soft Delete)"
+                    >
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
@@ -346,7 +375,7 @@ const PropertiesView: React.FC = () => {
         onClose={() => setIsDetailModalOpen(false)}
         property={selectedProperty}
         onValidate={handleValidate}
-        onDelete={() => toast('Suppression à implémenter', { icon: '🗑️' })}
+        onDelete={() => selectedProperty && triggerDelete(selectedProperty)}
       />
 
       <ReasonModal
@@ -355,6 +384,18 @@ const PropertiesView: React.FC = () => {
         onConfirm={confirmInvalidation}
         title="Invalider / Retirer le bien"
         description="Ce bien repassera en 'non validé' et ne sera plus visible. Vous pouvez indiquer une raison pour le propriétaire."
+      />
+
+      {/* Delete Reason Modal */}
+      <ReasonModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Supprimer la propriété ?"
+        description="ATTENTION : Cette action supprimera le bien de la liste active (Soft Delete). Les demandes de visites en attente seront rejetées."
+        label="Raison de la suppression (Optionnel)"
+        confirmLabel="Supprimer définitivement"
+        isDanger={true}
       />
 
     </div>

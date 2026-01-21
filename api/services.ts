@@ -134,6 +134,12 @@ export const propertyService = {
         const response = await client.put(`/admin/properties/${propertyId}/invalidate`, { reason });
         return response.data;
     },
+    deleteProperty: async (id: number, reason?: string) => {
+        const response = await client.delete(`/admin/properties/${id}`, {
+            data: { reason }
+        });
+        return response.data;
+    },
 };
 
 export const visitService = {
