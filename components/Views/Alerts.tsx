@@ -31,6 +31,8 @@ const AlertsView: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [selectedAlertId, setSelectedAlertId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAlerts();
@@ -49,16 +51,23 @@ const AlertsView: React.FC = () => {
     }
   };
 
-  const handleArchive = async (id: number) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir archiver cette alerte ?")) return;
+  const openArchiveModal = (id: number) => {
+    setSelectedAlertId(id);
+    setArchiveModalOpen(true);
+  };
+
+  const confirmArchive = async () => {
+    if (!selectedAlertId) return;
 
     try {
-      await requestService.archive(id);
+      await requestService.archive(selectedAlertId);
       toast.success("Alerte archivée avec succès");
+      setArchiveModalOpen(false);
+      setSelectedAlertId(null);
       fetchAlerts();
     } catch (error: any) {
       console.error(error);
-      const errorMessage = error?.response?.data?.message || "Erreur lors de l\'archivage";
+      const errorMessage = error?.response?.data?.message || "Erreur lors de l'archivage";
       toast.error(errorMessage);
     }
   };
@@ -272,7 +281,7 @@ const AlertsView: React.FC = () => {
                       </button>
                       {(alert.status === 'contacted' || alert.status === 'closed') && (
                         <button
-                          onClick={() => handleArchive(alert.id)}
+                          onClick={() => openArchiveModal(alert.id)}
                           className="flex items-center justify-center px-4 py-2 bg-slate-600 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors shadow-sm whitespace-nowrap"
                         >
                           Archiver
@@ -286,6 +295,35 @@ const AlertsView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Modale de Confirmation d'Archivage */}
+      {archiveModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-slate-800 mb-3">Archiver cette alerte ?</h3>
+            <p className="text-slate-600 mb-6">
+              Cette alerte sera masquée de la vue principale. Vous pourrez la restaurer à tout moment en activant le toggle "Afficher archivées".
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setArchiveModalOpen(false);
+                  setSelectedAlertId(null);
+                }}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmArchive}
+                className="px-4 py-2 bg-slate-600 text-white rounded-lg font-medium hover:bg-slate-700 transition-colors shadow-sm"
+              >
+                Archiver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
