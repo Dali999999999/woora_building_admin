@@ -220,12 +220,22 @@ export const settingsService = {
 };
 
 export const requestService = {
-    getAll: async () => {
-        const response = await client.get('/admin/property_requests');
+    getAll: async (includeArchived = false) => {
+        const response = await client.get('/admin/property_requests', {
+            params: { include_archived: includeArchived }
+        });
         return response.data;
     },
     respond: async (requestId: number, message: string) => {
         const response = await client.post(`/admin/property_requests/${requestId}/respond`, { message });
+        return response.data;
+    },
+    archive: async (requestId: number) => {
+        const response = await client.put(`/admin/property_requests/${requestId}/archive`);
+        return response.data;
+    },
+    unarchive: async (requestId: number) => {
+        const response = await client.put(`/admin/property_requests/${requestId}/unarchive`);
         return response.data;
     },
 };
