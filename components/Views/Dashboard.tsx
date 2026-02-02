@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 
 // Formatting helper for currency (FCFA)
 const formatMoney = (amount: number) => {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
+  return new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA';
 };
 
 const Dashboard: React.FC = () => {
@@ -19,6 +19,8 @@ const Dashboard: React.FC = () => {
     active_properties: 0,
     pending_visits: 0,
     total_revenue: 0,
+    revenue_chart: [],
+    user_growth_chart: []
   });
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,23 +44,9 @@ const Dashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Mock data for charts (Backend aggregation endpoints needed for real historical data)
-  const revenueData = [
-    { name: 'Jan', revenue: 0 },
-    { name: 'Fév', revenue: 0 },
-    { name: 'Mar', revenue: 0 },
-    { name: 'Avr', revenue: 0 },
-    { name: 'Mai', revenue: 0 },
-    { name: 'Current', revenue: stats.total_revenue },
-  ];
-
-  const userGrowthData = [
-    { name: 'Jan', clients: 0, owners: 0 },
-    { name: 'Fév', clients: 0, owners: 0 },
-    { name: 'Mar', clients: 0, owners: 0 },
-    { name: 'Avr', clients: 0, owners: 0 },
-    { name: 'Mai', clients: 0, owners: 0 },
-  ];
+  // Data comes from stats now, but we prepare empty defaults if loading
+  const revenueData = stats.revenue_chart || [];
+  const userGrowthData = stats.user_growth_chart || [];
 
   const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
