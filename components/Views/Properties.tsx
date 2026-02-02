@@ -159,6 +159,16 @@ const PropertiesView: React.FC = () => {
     setIsDetailModalOpen(true);
   };
 
+  const handlePropertyUpdate = (updatedProperty: Property) => {
+    setProperties(props => props.map(p =>
+      p.id === updatedProperty.id ? updatedProperty : p
+    ));
+    if (selectedProperty?.id === updatedProperty.id) {
+      setSelectedProperty(updatedProperty);
+    }
+  };
+
+
   const getStatusBadge = (property: any) => {
     if (!property.is_validated) {
       return <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1"><AlertCircle size={10} /> En attente</span>;
@@ -342,6 +352,7 @@ const PropertiesView: React.FC = () => {
                     )}
 
                     <button
+                      onClick={(e) => { e.stopPropagation(); openDetails(property); }}
                       className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                       title="Modifier le bien"
                     >
@@ -383,6 +394,7 @@ const PropertiesView: React.FC = () => {
         property={selectedProperty}
         onValidate={handleValidate}
         onDelete={() => selectedProperty && triggerDelete(selectedProperty)}
+        onUpdate={handlePropertyUpdate}
       />
 
       <ReasonModal

@@ -140,6 +140,10 @@ export const propertyService = {
         });
         return response.data;
     },
+    updateProperty: async (id: number, data: any) => {
+        const response = await client.put(`/admin/properties/${id}`, data);
+        return response.data;
+    },
 };
 
 export const visitService = {
