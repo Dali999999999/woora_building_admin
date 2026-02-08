@@ -167,6 +167,10 @@ export const configService = {
         const response = await client.get('/admin/property_types_with_attributes');
         return response.data;
     },
+    getPropertyStatuses: async () => {
+        const response = await client.get('/admin/property-statuses');
+        return response.data;
+    },
     getAllAttributes: async () => {
         const response = await client.get('/admin/property_attributes');
         return response.data;

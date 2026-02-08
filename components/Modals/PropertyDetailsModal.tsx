@@ -11,6 +11,7 @@ interface PropertyDetailsModalProps {
     onDelete: (id: number) => void;
     onUpdate?: (updatedProperty: Property) => void;
     initialEditMode?: boolean;
+    propertyStatuses?: { value: string, label: string }[];
 }
 
 const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
@@ -20,7 +21,8 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
     onValidate,
     onDelete,
     onUpdate,
-    initialEditMode = false
+    initialEditMode = false,
+    propertyStatuses = []
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
@@ -204,13 +206,22 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                                 onChange={(e) => handleInputChange('status', e.target.value)}
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                                             >
-                                                <option value="for_sale">À Vendre</option>
-                                                <option value="for_rent">À Louer</option>
-                                                <option value="vefa">VEFA</option>
-                                                <option value="bailler">Bailler</option>
-                                                <option value="location_vente">Location-vente</option>
-                                                <option value="sold">Vendu</option>
-                                                <option value="rented">Loué</option>
+                                                {propertyStatuses.length > 0 ? (
+                                                    propertyStatuses.map(status => (
+                                                        <option key={status.value} value={status.value}>{status.label}</option>
+                                                    ))
+                                                ) : (
+                                                    // Fallback si les statuts ne sont pas chargés
+                                                    <>
+                                                        <option value="for_sale">À Vendre</option>
+                                                        <option value="for_rent">À Louer</option>
+                                                        <option value="vefa">VEFA</option>
+                                                        <option value="bailler">Bailler</option>
+                                                        <option value="location_vente">Location-vente</option>
+                                                        <option value="sold">Vendu</option>
+                                                        <option value="rented">Loué</option>
+                                                    </>
+                                                )}
                                             </select>
                                         </div>
                                     </div>

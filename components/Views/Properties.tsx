@@ -9,6 +9,7 @@ import ReasonModal from '../Modals/ReasonModal';
 const PropertiesView: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
+  const [propertyStatuses, setPropertyStatuses] = useState<{ value: string, label: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters & Tabs
@@ -16,6 +17,8 @@ const PropertiesView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [agentFilter, setAgentFilter] = useState('all');
 
   // Modal State
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -37,12 +40,14 @@ const PropertiesView: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [props, types] = await Promise.all([
+      const [props, types, statuses] = await Promise.all([
         propertyService.getProperties(),
-        configService.getPropertyTypesWithAttributes()
+        configService.getPropertyTypesWithAttributes(),
+        configService.getPropertyStatuses()
       ]);
       setProperties(props);
       setPropertyTypes(types);
+      setPropertyStatuses(statuses);
     } catch (error) {
       console.error(error);
       toast.error("Erreur lors du chargement des biens");
@@ -68,10 +73,18 @@ const PropertiesView: React.FC = () => {
     const pTypeId = (p as any).property_type_id || p.type?.id;
     const matchesType = typeFilter === 'all' || (pTypeId && pTypeId.toString() === typeFilter);
 
-    // Status Filter (Sold/Rent)
+    // Status Filter
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
 
-    return matchesSearch && matchesType && matchesStatus;
+    // Owner Filter
+    const ownerDetails = (p as any).owner_details;
+    const matchesOwner = ownerFilter === 'all' || (ownerDetails?.id && ownerDetails.id.toString() === ownerFilter);
+
+    // Agent Filter
+    const agentDetails = (p as any).created_by_agent;
+    const matchesAgent = agentFilter === 'all' || (agentDetails?.agent_id && agentDetails.agent_id.toString() === agentFilter);
+
+    return matchesSearch && matchesType && matchesStatus && matchesOwner && matchesAgent;
   });
 
   const handleValidate = async (id: number) => {
@@ -270,8 +283,39 @@ const PropertiesView: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Tous statuts</option>
-              <option value="for_sale">À Vendre</option>
-              <option value="for_rent">À Louer</option>
+              {propertyStatuses.map(status => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+            <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          <div className="relative min-w-[160px]">
+            <select
+              className="w-full appearance-none bg-slate-50 border-transparent px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+            >
+              <option value="all">Tous propriétaires</option>
+              {Array.from(new Set(properties.map(p => (p as any).owner_details).filter(Boolean))).map((owner: any) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.first_name} {owner.last_name}
+                </option>
+              ))}
+            </select>
+            <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+          <div className="relative min-w-[160px]">
+            <select
+              className="w-full appearance-none bg-slate-50 border-transparent px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+            >
+              <option value="all">Tous agents</option>
+              {Array.from(new Set(properties.map(p => (p as any).created_by_agent).filter(Boolean))).map((agent: any) => (
+                <option key={agent.agent_id} value={agent.agent_id}>
+                  {agent.agent_name}
+                </option>
+              ))}
             </select>
             <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
@@ -390,15 +434,19 @@ const PropertiesView: React.FC = () => {
         )}
       </div>
 
-      <PropertyDetailsModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        property={selectedProperty}
-        initialEditMode={initialEditMode}
-        onValidate={handleValidate}
-        onDelete={() => selectedProperty && triggerDelete(selectedProperty)}
-        onUpdate={handlePropertyUpdate}
-      />
+      {/* Property Details Modal */}
+      {isDetailModalOpen && selectedProperty && (
+        <PropertyDetailsModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          property={selectedProperty}
+          initialEditMode={initialEditMode}
+          onValidate={handleValidate}
+          onDelete={confirmDelete}
+          onUpdate={handlePropertyUpdate}
+          propertyStatuses={propertyStatuses}
+        />
+      )}
 
       <ReasonModal
         isOpen={isReasonModalOpen}
