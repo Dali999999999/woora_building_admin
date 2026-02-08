@@ -63,10 +63,19 @@ const PropertiesView: React.FC = () => {
     // Tab Filter
     if (activeTab === 'pending' && p.is_validated) return false;
 
+    // Helper to get status string safe
+    const statusName = p.status && typeof p.status === 'object' && (p.status as any).name
+      ? (p.status as any).name
+      : (typeof p.status === 'string' ? p.status : '');
+
     // Search
     const location = `${p.attributes?.address || ''} ${p.attributes?.city || ''}`.toLowerCase();
-    const titleMatch = (p.attributes?.title || p.status).toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSearch = titleMatch || location.includes(searchTerm.toLowerCase());
+    const title = (p.attributes?.title || p.attributes?.titre || '').toLowerCase();
+    const statusSearch = statusName.toLowerCase();
+
+    // Fallback title to status if title missing is weird but keeping legacy logic intent
+    const titleMatch = (title || statusSearch).includes(searchTerm.toLowerCase());
+    const matchesSearch = titleMatch || location.includes(searchTerm.toLowerCase()) || statusSearch.includes(searchTerm.toLowerCase());
 
     // Type Filter
     const typeId = p.type?.id;
@@ -74,7 +83,8 @@ const PropertiesView: React.FC = () => {
     const matchesType = typeFilter === 'all' || (pTypeId && pTypeId.toString() === typeFilter);
 
     // Status Filter
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+    // Status filter values are names (e.g., "À Vendre") or legacy codes ("for_sale")
+    const matchesStatus = statusFilter === 'all' || statusName === statusFilter || statusName === statusFilter;
 
     // Owner Filter
     const ownerDetails = (p as any).owner_details;
