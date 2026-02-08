@@ -189,29 +189,34 @@ const PropertiesView: React.FC = () => {
       return <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1"><AlertCircle size={10} /> En attente</span>;
     }
 
-    // NOUVEAU : Utilisation du statut dynamique s'il est présent
-    if (property.property_status) {
+    // Check if status is the new object format { id, name, color }
+    // The backend now returns the status object in the 'status' field
+    const statusObj = property.status && typeof property.status === 'object' ? property.status : property.property_status;
+
+    if (statusObj && statusObj.name) {
       return (
         <span
           className="px-2 py-1 rounded text-xs font-medium border"
           style={{
-            backgroundColor: `${property.property_status.color}20`, // 20 = 12% opacity (approx) or use rgba
-            color: property.property_status.color,
-            borderColor: `${property.property_status.color}40`
+            backgroundColor: `${statusObj.color}20`,
+            color: statusObj.color,
+            borderColor: `${statusObj.color}40`
           }}
         >
-          {property.property_status.name}
+          {statusObj.name}
         </span>
       );
     }
 
-    // FALLBACK : Ancien système si property_status n'est pas encore peuplé (migration)
-    switch (property.status) {
+    // FALLBACK for legacy string status
+    const statusString = typeof property.status === 'string' ? property.status : 'Inconnu';
+
+    switch (statusString) {
       case 'for_sale': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs font-medium">À Vendre</span>;
       case 'for_rent': return <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-medium">À Louer</span>;
       case 'sold': return <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs font-medium">Vendu</span>;
       case 'rented': return <span className="px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-medium">Loué</span>;
-      default: return <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-medium">{property.status}</span>;
+      default: return <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-medium">{statusString}</span>;
     }
   };
 

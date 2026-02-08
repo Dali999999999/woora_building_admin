@@ -30,11 +30,21 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
 
     useEffect(() => {
         if (isOpen && property) {
+            // Extract status string if property.status is an object
+            let statusValue = 'for_sale';
+            if (property.status) {
+                if (typeof property.status === 'object' && (property.status as any).name) {
+                    statusValue = (property.status as any).name;
+                } else if (typeof property.status === 'string') {
+                    statusValue = property.status;
+                }
+            }
+
             setFormData({
                 title: property.attributes?.title || property.attributes?.titre || '',
                 description: property.attributes?.description || '',
                 price: property.attributes?.price || 0,
-                status: property.status || 'for_sale',
+                status: statusValue,
                 address: property.attributes?.address || '',
                 city: property.attributes?.city || '',
                 attributes: { ...property.attributes }
@@ -207,8 +217,10 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                                             >
                                                 {propertyStatuses.length > 0 ? (
-                                                    propertyStatuses.map(status => (
-                                                        <option key={status.value} value={status.value}>{status.label}</option>
+                                                    propertyStatuses.map((status: any) => (
+                                                        <option key={status.id || status.value} value={status.name || status.value}>
+                                                            {status.name || status.label}
+                                                        </option>
                                                     ))
                                                 ) : (
                                                     // Fallback si les statuts ne sont pas chargés
@@ -373,9 +385,6 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                                 <Mail size={16} className="text-slate-400" />
                                                 <a href={`mailto:${agent.agent_email}`} className="truncate hover:text-emerald-600 transition-colors">{agent.agent_email}</a>
                                             </div>
-                                            {/* Note: Agent phone number is typically not in created_by_agent dict yet, 
-                                                 but if needed we can add it to backend. 
-                                                 For now we show what we have. */}
                                         </div>
                                     </div>
                                 </div>

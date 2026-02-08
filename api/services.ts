@@ -15,10 +15,17 @@ export interface User {
 }
 
 
+export interface PropertyStatus {
+    id: number;
+    name: string;
+    color: string;
+    description?: string;
+}
+
 export interface Property {
     id: number;
     owner_id: number;
-    status: string;
+    status: string | PropertyStatus;
     created_at: string;
     image_urls: string[];
     attributes: Record<string, any>;
