@@ -296,9 +296,16 @@ const PropertiesView: React.FC = () => {
               onChange={(e) => setOwnerFilter(e.target.value)}
             >
               <option value="all">Tous propriétaires</option>
-              {Array.from(new Set(properties.map(p => (p as any).owner_details).filter(Boolean))).map((owner: any) => (
+              {Array.from(
+                new Map(
+                  properties
+                    .map(p => (p as any).owner_details)
+                    .filter(Boolean)
+                    .map(owner => [owner.id, owner])  // [id, owner object]
+                ).values()
+              ).map((owner: any) => (
                 <option key={owner.id} value={owner.id}>
-                  {owner.first_name} {owner.last_name}
+                  {owner.first_name} {owner.last_name} ({owner.email})
                 </option>
               ))}
             </select>
@@ -311,9 +318,16 @@ const PropertiesView: React.FC = () => {
               onChange={(e) => setAgentFilter(e.target.value)}
             >
               <option value="all">Tous agents</option>
-              {Array.from(new Set(properties.map(p => (p as any).created_by_agent).filter(Boolean))).map((agent: any) => (
+              {Array.from(
+                new Map(
+                  properties
+                    .map(p => (p as any).created_by_agent)
+                    .filter(Boolean)
+                    .map(agent => [agent.agent_id, agent])  // [agent_id, agent object]
+                ).values()
+              ).map((agent: any) => (
                 <option key={agent.agent_id} value={agent.agent_id}>
-                  {agent.agent_name}
+                  {agent.agent_name} ({agent.agent_email})
                 </option>
               ))}
             </select>
