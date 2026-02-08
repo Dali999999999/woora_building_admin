@@ -115,10 +115,11 @@ const PropertyStatuses: React.FC = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <span
-                                                    className="w-3 h-3 rounded-full"
+                                                    className="px-2 py-1 rounded text-xs font-bold text-white shadow-sm"
                                                     style={{ backgroundColor: status.color }}
-                                                ></span>
-                                                <span className="font-medium text-slate-700">{status.name}</span>
+                                                >
+                                                    {status.name}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-slate-500 font-mono text-sm">

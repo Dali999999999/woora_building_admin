@@ -206,11 +206,9 @@ const PropertiesView: React.FC = () => {
     if (statusObj && statusObj.name) {
       return (
         <span
-          className="px-2 py-1 rounded text-xs font-medium border"
+          className="px-2 py-1 rounded text-xs font-bold text-white shadow-sm"
           style={{
-            backgroundColor: `${statusObj.color}20`,
-            color: statusObj.color,
-            borderColor: `${statusObj.color}40`
+            backgroundColor: statusObj.color,
           }}
         >
           {statusObj.name}
@@ -222,11 +220,11 @@ const PropertiesView: React.FC = () => {
     const statusString = typeof property.status === 'string' ? property.status : 'Inconnu';
 
     switch (statusString) {
-      case 'for_sale': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs font-medium">À Vendre</span>;
-      case 'for_rent': return <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-medium">À Louer</span>;
-      case 'sold': return <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs font-medium">Vendu</span>;
-      case 'rented': return <span className="px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-medium">Loué</span>;
-      default: return <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-medium">{statusString}</span>;
+      case 'for_sale': return <span className="px-2 py-1 rounded bg-emerald-600 text-white text-xs font-bold shadow-sm">À Vendre</span>;
+      case 'for_rent': return <span className="px-2 py-1 rounded bg-blue-600 text-white text-xs font-bold shadow-sm">À Louer</span>;
+      case 'sold': return <span className="px-2 py-1 rounded bg-slate-600 text-white text-xs font-bold shadow-sm">Vendu</span>;
+      case 'rented': return <span className="px-2 py-1 rounded bg-indigo-600 text-white text-xs font-bold shadow-sm">Loué</span>;
+      default: return <span className="px-2 py-1 rounded bg-gray-600 text-white text-xs font-bold shadow-sm">{statusString}</span>;
     }
   };
 
