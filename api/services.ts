@@ -201,6 +201,18 @@ export const configService = {
         const response = await client.post(`/admin/property_type_scopes/${typeId}`, { attribute_ids: attributeIds });
         return response.data;
     },
+    // --- PROPERTY STATUSES CRUD ---
+    createPropertyStatus: async (data: any) => {
+        const response = await client.post('/admin/property-statuses', data);
+        return response.data;
+    },
+    updatePropertyStatus: async (id: number, data: any) => {
+        const response = await client.put(`/admin/property-statuses/${id}`, data);
+        return response.data;
+    },
+    deletePropertyStatus: async (id: number) => {
+        await client.delete(`/admin/property-statuses/${id}`);
+    },
 };
 
 export const settingsService = {

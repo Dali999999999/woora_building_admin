@@ -189,6 +189,23 @@ const PropertiesView: React.FC = () => {
       return <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1"><AlertCircle size={10} /> En attente</span>;
     }
 
+    // NOUVEAU : Utilisation du statut dynamique s'il est présent
+    if (property.property_status) {
+      return (
+        <span
+          className="px-2 py-1 rounded text-xs font-medium border"
+          style={{
+            backgroundColor: `${property.property_status.color}20`, // 20 = 12% opacity (approx) or use rgba
+            color: property.property_status.color,
+            borderColor: `${property.property_status.color}40`
+          }}
+        >
+          {property.property_status.name}
+        </span>
+      );
+    }
+
+    // FALLBACK : Ancien système si property_status n'est pas encore peuplé (migration)
     switch (property.status) {
       case 'for_sale': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs font-medium">À Vendre</span>;
       case 'for_rent': return <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-medium">À Louer</span>;
@@ -283,8 +300,8 @@ const PropertiesView: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Tous statuts</option>
-              {propertyStatuses.map(status => (
-                <option key={status.value} value={status.value}>{status.label}</option>
+              {propertyStatuses.map((status: any) => (
+                <option key={status.id || status.value} value={status.name || status.value}>{status.name || status.label}</option>
               ))}
             </select>
             <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />

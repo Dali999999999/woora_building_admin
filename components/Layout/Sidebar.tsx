@@ -14,6 +14,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'properties', label: 'Biens Immobiliers', icon: Building2 },
     { id: 'visits', label: 'Demandes de Visite', icon: CalendarDays },
+    { id: 'statuses', label: 'Gestion des Statuts', icon: Layers }, // Renamed/New icon suggested? Layers is used for Config. Let's use something else or re-use Layers if Config is Types & Attributes.
     { id: 'alerts', label: 'Alertes Client', icon: Bell },
     { id: 'config', label: 'Types & Attributs', icon: Layers },
     { id: 'settings', label: 'Paramètres', icon: Settings },

@@ -7,6 +7,7 @@ import PropertiesView from './components/Views/Properties';
 import VisitsView from './components/Views/Visits';
 import AlertsView from './components/Views/Alerts';
 import ConfigView from './components/Views/Config';
+import PropertyStatusesView from './components/Views/PropertyStatuses';
 import SettingsView from './components/Views/Settings';
 import { Menu, Bell } from 'lucide-react';
 import Login from './pages/Login';
@@ -29,6 +30,7 @@ const ProtectedLayout: React.FC = () => {
       case 'properties': return <PropertiesView />;
       case 'visits': return <VisitsView />;
       case 'alerts': return <AlertsView />;
+      case 'statuses': return <PropertyStatusesView />; // Added route
       case 'config': return <ConfigView />;
       case 'settings': return <SettingsView />;
       default: return <Dashboard />;
