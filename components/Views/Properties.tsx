@@ -20,6 +20,7 @@ const PropertiesView: React.FC = () => {
   // Modal State
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [initialEditMode, setInitialEditMode] = useState(false);
 
   // Invalidation State
   const [propertyToInvalidate, setPropertyToInvalidate] = useState<Property | null>(null);
@@ -154,8 +155,9 @@ const PropertiesView: React.FC = () => {
   };
 
 
-  const openDetails = (property: Property) => {
+  const openDetails = (property: Property, editMode = false) => {
     setSelectedProperty(property);
+    setInitialEditMode(editMode);
     setIsDetailModalOpen(true);
   };
 
@@ -352,7 +354,7 @@ const PropertiesView: React.FC = () => {
                     )}
 
                     <button
-                      onClick={(e) => { e.stopPropagation(); openDetails(property); }}
+                      onClick={(e) => { e.stopPropagation(); openDetails(property, true); }}
                       className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                       title="Modifier le bien"
                     >
@@ -392,6 +394,7 @@ const PropertiesView: React.FC = () => {
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         property={selectedProperty}
+        initialEditMode={initialEditMode}
         onValidate={handleValidate}
         onDelete={() => selectedProperty && triggerDelete(selectedProperty)}
         onUpdate={handlePropertyUpdate}

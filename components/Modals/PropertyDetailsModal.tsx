@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, User, Phone, Mail, Calendar, CheckCircle, AlertTriangle, Edit, Save } from 'lucide-react';
+import { X, MapPin, User, Phone, Mail, Calendar, CheckCircle, AlertTriangle, Edit, Save, Briefcase } from 'lucide-react';
 import { Property, propertyService } from '../../api/services';
 import toast from 'react-hot-toast';
 
@@ -10,6 +10,7 @@ interface PropertyDetailsModalProps {
     onValidate: (id: number) => void;
     onDelete: (id: number) => void;
     onUpdate?: (updatedProperty: Property) => void;
+    initialEditMode?: boolean;
 }
 
 const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
@@ -18,14 +19,15 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
     property,
     onValidate,
     onDelete,
-    onUpdate
+    onUpdate,
+    initialEditMode = false
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (property) {
+        if (isOpen && property) {
             setFormData({
                 title: property.attributes?.title || property.attributes?.titre || '',
                 description: property.attributes?.description || '',
@@ -35,14 +37,15 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                 city: property.attributes?.city || '',
                 attributes: { ...property.attributes }
             });
-            setIsEditing(false);
+            setIsEditing(initialEditMode);
         }
-    }, [property]);
+    }, [isOpen, property, initialEditMode]);
 
     if (!isOpen || !property) return null;
 
-    // Helper to safely access owner details
+    // Helper to safely access details
     const owner = (property as any).owner_details;
+    const agent = (property as any).created_by_agent;
     const images = property.image_urls || [];
     const mainImage = images.length > 0 ? images[0] : 'https://via.placeholder.com/600x400?text=No+Image';
 
@@ -316,7 +319,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                             <div className="space-y-3 pt-2">
                                                 <div className="flex items-center gap-3 text-sm text-slate-600">
                                                     <Mail size={16} className="text-slate-400" />
-                                                    <span className="truncate">{owner.email}</span>
+                                                    <a href={`mailto:${owner.email}`} className="truncate hover:text-indigo-600 transition-colors">{owner.email}</a>
                                                 </div>
                                                 <div className="flex items-center gap-3 text-sm text-slate-600">
                                                     <Phone size={16} className="text-slate-400" />
@@ -335,6 +338,37 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                     )}
                                 </div>
                             </div>
+
+                            {/* Agent Card (New) */}
+                            {agent && (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center gap-2">
+                                        <Briefcase size={20} className="text-emerald-600" />
+                                        <h3 className="font-bold text-emerald-900">Agent Responsable</h3>
+                                    </div>
+                                    <div className="p-6 space-y-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl font-bold overflow-hidden border-2 border-white shadow-sm">
+                                                {agent.agent_name ? agent.agent_name[0] : 'A'}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900">{agent.agent_name}</p>
+                                                <p className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full inline-block">Agent</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 pt-2 border-t border-slate-50 mt-2">
+                                            <div className="flex items-center gap-3 text-sm text-slate-600">
+                                                <Mail size={16} className="text-slate-400" />
+                                                <a href={`mailto:${agent.agent_email}`} className="truncate hover:text-emerald-600 transition-colors">{agent.agent_email}</a>
+                                            </div>
+                                            {/* Note: Agent phone number is typically not in created_by_agent dict yet, 
+                                                 but if needed we can add it to backend. 
+                                                 For now we show what we have. */}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Admin Actions */}
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
