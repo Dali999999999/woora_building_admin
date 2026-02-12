@@ -51,6 +51,18 @@ const VisitsView: React.FC = () => {
     }
   };
 
+  const handleCancel = async (id: number) => {
+    if (!window.confirm("Voulez-vous vraiment annuler cette visite ? Le pass sera remboursé au client.")) return;
+    try {
+      await visitService.rejectVisit(id, "Annulation par l'administrateur");
+      toast.success("Visite annulée avec succès");
+      fetchVisits();
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de l'annulation");
+    }
+  };
+
   const handleComplete = async (id: number) => {
     if (!window.confirm("Confirmez-vous que cette visite a été effectuée ?")) return;
     try {
@@ -150,14 +162,27 @@ const VisitsView: React.FC = () => {
                 </div>
               )}
 
-              {visit.status === 'accepted' && (
-                <div className="mt-4">
+              {/* Actions pour les visites en cours (Confirmée ou Acceptée) */}
+              {(visit.status === 'confirmed' || visit.status === 'accepted') && (
+                <div className="mt-4 space-y-2">
+                  {/* Seule une visite ACCEPTÉE peut être marquée comme effectuée */}
+                  {visit.status === 'accepted' && (
+                    <button
+                      onClick={() => handleComplete(visit.id)}
+                      className="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
+                    >
+                      <CheckCircle size={16} className="mr-2" />
+                      Marquer comme effectuée
+                    </button>
+                  )}
+
+                  {/* On peut ANNULER une visite confirmée ou acceptée */}
                   <button
-                    onClick={() => handleComplete(visit.id)}
-                    className="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
+                    onClick={() => handleCancel(visit.id)}
+                    className="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
                   >
-                    <CheckCircle size={16} className="mr-2" />
-                    Marquer comme effectuée
+                    <XCircle size={16} className="mr-2" />
+                    Annuler la visite
                   </button>
                 </div>
               )}
