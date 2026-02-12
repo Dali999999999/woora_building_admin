@@ -11,8 +11,17 @@ const client = axios.create({
 });
 
 client.interceptors.request.use((config) => {
-  // We don't need to manually attach the token anymore if using cookies
-  // But we can keep it as a fallback or for hybrid support if local storage is still used
+  // Security: Extract CSRF token from cookie and add to headers
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrf_access_token='))
+    ?.split('=')[1];
+
+  if (csrfToken) {
+    config.headers['X-CSRF-TOKEN'] = csrfToken;
+  }
+
+  // Fallback for legacy token support (if needed)
   const token = localStorage.getItem('jwt_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
