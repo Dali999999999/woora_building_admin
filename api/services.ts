@@ -126,10 +126,10 @@ export const propertyService = {
         const response = await client.get(`/admin/properties/${propertyId}/eligible_buyers`);
         return response.data;
     },
-    markAsTransacted: async (propertyId: number, status: 'sold' | 'rented', winningVisitRequestId: number) => {
+    markAsTransacted: async (propertyId: number, status: 'sold' | 'rented', buyerId: number) => {
         const response = await client.put(`/admin/properties/${propertyId}/mark_as_transacted`, {
             status,
-            winning_visit_request_id: winningVisitRequestId,
+            buyer_id: buyerId,
         });
         return response.data;
     },
@@ -165,6 +165,10 @@ export const visitService = {
     },
     rejectVisit: async (requestId: number, reason: string) => {
         const response = await client.put(`/admin/visit_requests/${requestId}/reject`, { message: reason });
+        return response.data;
+    },
+    markAsCompleted: async (requestId: number) => {
+        const response = await client.put(`/admin/visit_requests/${requestId}/complete`);
         return response.data;
     },
 };

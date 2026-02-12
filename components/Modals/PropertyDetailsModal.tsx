@@ -103,6 +103,56 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    // --- Transaction Logic ---
+    const [showTransactForm, setShowTransactForm] = useState(false);
+    const [eligibleBuyers, setEligibleBuyers] = useState<any[]>([]);
+    const [loadingBuyers, setLoadingBuyers] = useState(false);
+    const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
+    const [transactionStatus, setTransactionStatus] = useState<'sold' | 'rented'>('sold');
+
+    useEffect(() => {
+        if (showTransactForm && property) {
+            fetchEligibleBuyers();
+        }
+    }, [showTransactForm, property]);
+
+    const fetchEligibleBuyers = async () => {
+        if (!property) return;
+        setLoadingBuyers(true);
+        try {
+            const data = await propertyService.getEligibleBuyers(property.id);
+            setEligibleBuyers(data);
+        } catch (error) {
+            console.error("Error fetching buyers:", error);
+            toast.error("Impossible de charger les acheteurs potentiels");
+        } finally {
+            setLoadingBuyers(false);
+        }
+    };
+
+    const handleTransact = async () => {
+        if (!property || !selectedBuyerId) return;
+
+        if (!confirm(`Confirmez-vous que le bien a été ${transactionStatus === 'sold' ? 'VENDU' : 'LOUÉ'} à ce client ?\n\nCette action générera automatiquement les commissions et notifiera les parties.`)) {
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await propertyService.markAsTransacted(property.id, transactionStatus, selectedBuyerId);
+            toast.success("Transaction enregistrée ! Félicitations 🎉");
+            setShowTransactForm(false);
+            onClose(); // Close modal on success
+            if (onValidate) onValidate(property.id); // Trigger refresh if needed, utilizing existing prop
+        } catch (error) {
+            console.error("Transaction error:", error);
+            toast.error("Erreur lors de la finalisation");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div
@@ -404,6 +454,82 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                             <CheckCircle size={18} className="group-hover:scale-110 transition-transform" />
                                             Valider ce bien
                                         </button>
+                                    )}
+
+                                    {property.is_validated && !['sold', 'rented'].includes(String(formData.status)) && (
+                                        <div className="border-t border-slate-100 pt-3 mt-1">
+                                            {!showTransactForm ? (
+                                                <button
+                                                    onClick={() => setShowTransactForm(true)}
+                                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-emerald-200 shadow-md transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Briefcase size={18} />
+                                                    Clôturer la transaction
+                                                </button>
+                                            ) : (
+                                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-2">
+                                                    <h4 className="font-bold text-slate-800 text-sm">Finaliser la transaction</h4>
+
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Type de transaction</label>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setTransactionStatus('sold')}
+                                                                className={`flex-1 py-1.5 text-sm rounded border ${transactionStatus === 'sold' ? 'bg-emerald-100 border-emerald-500 text-emerald-700 font-bold' : 'bg-white border-slate-300 text-slate-600'}`}
+                                                            >
+                                                                Vendu
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setTransactionStatus('rented')}
+                                                                className={`flex-1 py-1.5 text-sm rounded border ${transactionStatus === 'rented' ? 'bg-blue-100 border-blue-500 text-blue-700 font-bold' : 'bg-white border-slate-300 text-slate-600'}`}
+                                                            >
+                                                                Loué
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Client Acquéreur (Visites effectuées)</label>
+                                                        {loadingBuyers ? (
+                                                            <div className="text-xs text-slate-500 italic">Chargement des clients...</div>
+                                                        ) : (
+                                                            <select
+                                                                value={selectedBuyerId || ''}
+                                                                onChange={(e) => setSelectedBuyerId(Number(e.target.value))}
+                                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-indigo-500"
+                                                            >
+                                                                <option value="">-- Sélectionner le client --</option>
+                                                                {eligibleBuyers.length > 0 ? (
+                                                                    eligibleBuyers.map((buyer: any) => (
+                                                                        <option key={buyer.user_id} value={buyer.user_id}>
+                                                                            {buyer.user_name} {buyer.has_referral ? '⭐ (Parrainé)' : ''}
+                                                                        </option>
+                                                                    ))
+                                                                ) : (
+                                                                    <option disabled>Aucun client éligible (visite effectuée requise)</option>
+                                                                )}
+                                                            </select>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex gap-2 pt-2">
+                                                        <button
+                                                            onClick={() => setShowTransactForm(false)}
+                                                            className="flex-1 py-2 text-slate-500 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
+                                                        >
+                                                            Annuler
+                                                        </button>
+                                                        <button
+                                                            onClick={handleTransact}
+                                                            disabled={!selectedBuyerId || saving}
+                                                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                        >
+                                                            {saving ? '...' : 'Valider'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
 
                                     <button
