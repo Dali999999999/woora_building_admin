@@ -18,7 +18,7 @@ interface Alert {
   city: string;
   min_price: number;
   max_price: number;
-  status: 'new' | 'in_progress' | 'contacted' | 'responded' | 'closed' | 'cancelled';
+  status: 'new' | 'in_progress' | 'contacted' | 'closed';
   created_at: string;
   archived_at: string | null;
   archived_by: number | null;
@@ -28,7 +28,7 @@ interface Alert {
 }
 
 const AlertsView: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'new' | 'in_progress' | 'contacted' | 'responded' | 'closed' | 'cancelled'>('all');
+  const [filter, setFilter] = useState<'all' | 'new' | 'in_progress' | 'contacted' | 'closed'>('all');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -152,15 +152,13 @@ const AlertsView: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['all', 'new', 'in_progress', 'contacted', 'responded', 'closed', 'cancelled'] as const).map((f) => {
+        {(['all', 'new', 'in_progress', 'contacted', 'closed'] as const).map((f) => {
           const labels = {
             all: 'Toutes',
             new: 'Nouvelles',
             in_progress: 'En cours',
             contacted: 'Contactées',
-            responded: 'Répondues',
-            closed: 'Fermées',
-            cancelled: 'Annulées'
+            closed: 'Fermées'
           };
           return (
             <button
@@ -245,10 +243,8 @@ const AlertsView: React.FC = () => {
                         const statusConfig = {
                           new: { label: 'Nouvelle', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
                           in_progress: { label: 'En cours', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
-                          contacted: { label: 'Contact\u00e9e', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
-                          responded: { label: 'R\u00e9pondue', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
-                          closed: { label: 'Ferm\u00e9e', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
-                          cancelled: { label: 'Annul\u00e9e', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+                          contacted: { label: 'Contactée', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+                          closed: { label: 'Fermée', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
                         };
                         const config = statusConfig[alert.status] || statusConfig.new;
                         return (
