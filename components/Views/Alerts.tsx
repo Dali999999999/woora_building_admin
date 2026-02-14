@@ -18,16 +18,17 @@ interface Alert {
   city: string;
   min_price: number;
   max_price: number;
-  status: 'new' | 'contacted' | 'closed';
+  status: 'new' | 'in_progress' | 'contacted' | 'responded' | 'closed' | 'cancelled';
   created_at: string;
   archived_at: string | null;
   archived_by: number | null;
   customer: Customer | null;
   property_type_name: string;
+  admin_response?: string;
 }
 
 const AlertsView: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'new' | 'contacted'>('all');
+  const [filter, setFilter] = useState<'all' | 'new' | 'in_progress' | 'contacted' | 'responded' | 'closed' | 'cancelled'>('all');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -150,19 +151,30 @@ const AlertsView: React.FC = () => {
         </label>
       </div>
 
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['all', 'new', 'contacted'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${filter === f
-              ? 'bg-white text-indigo-600 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            {f === 'all' ? 'Toutes' : f === 'new' ? 'Nouvelles' : 'Traitées'}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        {(['all', 'new', 'in_progress', 'contacted', 'responded', 'closed', 'cancelled'] as const).map((f) => {
+          const labels = {
+            all: 'Toutes',
+            new: 'Nouvelles',
+            in_progress: 'En cours',
+            contacted: 'Contactées',
+            responded: 'Répondues',
+            closed: 'Fermées',
+            cancelled: 'Annulées'
+          };
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${filter === f
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              {labels[f]}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -227,18 +239,31 @@ const AlertsView: React.FC = () => {
                         </h3>
                       </div>
                     </div>
-                    {alert.archived_at && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                        Archivée
-                      </span>
-                    )}
-                    {alert.status === 'new' && !alert.archived_at && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 animate-pulse">
-                        Nouvelle
-                      </span>
-                    )}
+                    {/* Status Badge */}
+                    <div className="flex flex-col items-end gap-2">
+                      {(() => {
+                        const statusConfig = {
+                          new: { label: 'Nouvelle', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
+                          in_progress: { label: 'En cours', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
+                          contacted: { label: 'Contact\u00e9e', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+                          responded: { label: 'R\u00e9pondue', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
+                          closed: { label: 'Ferm\u00e9e', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+                          cancelled: { label: 'Annul\u00e9e', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+                        };
+                        const config = statusConfig[alert.status] || statusConfig.new;
+                        return (
+                          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
+                            {config.label}
+                          </span>
+                        );
+                      })()}
+                      {alert.archived_at && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium bg-slate-200 text-slate-700 border border-slate-300">
+                          Archiv\u00e9e
+                        </span>
+                      )}
+                    </div>
                   </div>
-
                   {/* Budget & Specs */}
                   <div className="flex flex-wrap gap-4 mb-4 text-sm text-slate-600">
                     <div className="flex items-center bg-slate-50 px-3 py-1.5 rounded-lg">
@@ -256,6 +281,19 @@ const AlertsView: React.FC = () => {
                   <div>
                     {renderDetails(alert.request_details)}
                   </div>
+
+                  {/* Admin Response */}
+                  {alert.admin_response && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Mail className="text-green-600 mt-0.5" size={16} />
+                        <div className="flex-1">
+                          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Réponse envoyée</div>
+                          <p className="text-sm text-slate-700">{alert.admin_response}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
