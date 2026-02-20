@@ -131,6 +131,12 @@ const VisitsView: React.FC = () => {
                     <UserIcon size={14} className="mr-1" />
                     Client: {visit.customer_name || 'Inconnu'}
                   </p>
+                  {visit.referral && (
+                    <p className="text-sm text-indigo-600 flex items-center mt-1 bg-indigo-50 w-fit px-2 py-0.5 rounded border border-indigo-100">
+                      <UserIcon size={12} className="mr-1" />
+                      Parrainé par: {visit.referral.agent_name} (Code: {visit.referral.code})
+                    </p>
+                  )}
                 </div>
                 {visit.status === 'pending' && <span className="flex items-center text-amber-500 bg-amber-50 px-2 py-1 rounded text-xs font-medium"><Clock size={12} className="mr-1" /> En attente</span>}
                 {visit.status === 'confirmed' && <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded text-xs font-medium"><CheckCircle size={12} className="mr-1" /> Confirmé</span>}

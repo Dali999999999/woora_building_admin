@@ -43,6 +43,12 @@ export interface VisitRequest {
     created_at: string;
     seeker?: User;
     property?: Property;
+    referral?: {
+        id: number;
+        code: string;
+        agent_name: string;
+        agent_email?: string;
+    };
 }
 
 export interface PropertyRequest {
