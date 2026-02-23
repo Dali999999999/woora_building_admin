@@ -27,6 +27,8 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
+    const [editImages, setEditImages] = useState<string[]>([]);
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => {
         if (isOpen && property) {
@@ -49,6 +51,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                 city: property.attributes?.city || '',
                 attributes: { ...property.attributes }
             });
+            setEditImages([...(property.image_urls || [])]);
             setIsEditing(initialEditMode);
         }
     }, [isOpen, property, initialEditMode]);
@@ -71,6 +74,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
         try {
             // Prepare update data
             const updateData = {
+                image_urls: editImages,
                 attributes: {
                     ...formData.attributes, // Keep existing dynamic attributes
                     title: formData.title,
@@ -101,6 +105,28 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
 
     const handleInputChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        setUploadingImage(true);
+        try {
+            const result = await propertyService.uploadImage(file);
+            setEditImages(prev => [...prev, result.url]);
+            toast.success("Image ajoutée");
+        } catch (error) {
+            console.error(error);
+            toast.error("Erreur d'upload de l'image");
+        } finally {
+            setUploadingImage(false);
+            e.target.value = ''; // Reset input
+        }
+    };
+
+    const handleRemoveImage = (indexToRemove: number) => {
+        setEditImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
     };
 
     // --- Transaction Logic ---
@@ -312,16 +338,50 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                             )}
 
                             {/* Gallery Grid */}
-                            {!isEditing && images.length > 1 && (
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Galerie Photos ({images.length})</h3>
-                                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                                        {images.map((url: string, idx: number) => (
-                                            <div key={idx} className="aspect-square rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity">
-                                                <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
-                                            </div>
-                                        ))}
+                            {!isEditing ? (
+                                images.length > 1 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Galerie Photos ({images.length})</h3>
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                                            {images.map((url: string, idx: number) => (
+                                                <div key={idx} className="aspect-square rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity">
+                                                    <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
+                                )
+                            ) : (
+                                <div className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200 mt-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="font-bold text-slate-800">Galerie Photos ({editImages.length})</h3>
+                                        <div>
+                                            <input type="file" id="image-upload" className="hidden" accept="image/*" onChange={handleUploadImage} disabled={uploadingImage} />
+                                            <label htmlFor="image-upload" className="cursor-pointer px-4 py-2 bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-2">
+                                                {uploadingImage ? 'Envoi...' : '+ Ajouter'}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {editImages.length > 0 ? (
+                                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                            {editImages.map((url: string, idx: number) => (
+                                                <div key={idx} className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-white">
+                                                    <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                                                    <button
+                                                        onClick={(e) => { e.preventDefault(); handleRemoveImage(idx); }}
+                                                        className="absolute top-1 right-1 bg-white/90 text-rose-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-50 flex items-center justify-center h-6 w-6"
+                                                        title="Supprimer cette image"
+                                                    >
+                                                        <X size={14} strokeWidth={3} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-slate-500 italic text-center py-4 border-2 border-dashed border-slate-200 rounded-lg">
+                                            Aucune image pour l'instant
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

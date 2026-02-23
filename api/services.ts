@@ -157,6 +157,16 @@ export const propertyService = {
         const response = await client.put(`/admin/properties/${id}`, data);
         return response.data;
     },
+    uploadImage: async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await client.post('/admin/upload_image', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
 };
 
 export const visitService = {
