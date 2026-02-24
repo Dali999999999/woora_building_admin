@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers, Plus, Database, Edit2, Trash2, Settings2, Check,
-  Pencil, Tag, SlidersHorizontal, ChevronRight, X, Save,
-  ToggleLeft, Hash, Type, List
+  Pencil, Tag, SlidersHorizontal, X, Save,
+  ToggleLeft, Hash, Type, List, GripVertical, ArrowUpDown
 } from 'lucide-react';
 import { configService } from '../../api/services';
 import toast from 'react-hot-toast';
@@ -39,6 +39,112 @@ const EmptyState: React.FC<{ icon: any; title: string; description: string }> = 
   </div>
 );
 
+// --- Drag-and-Drop Attribute List for Sidebar ---
+
+interface DraggableAttrListProps {
+  allAttributes: any[];
+  selectedAttributes: any[];     // ordered list of currently selected attrs
+  onOrderChange: (newOrdered: any[]) => void;
+  onToggle: (attrId: number) => void;
+}
+
+const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, selectedAttributes, onOrderChange, onToggle }) => {
+  const selectedIds = new Set(selectedAttributes.map((a: any) => a.id));
+  const unselected = allAttributes.filter(a => !selectedIds.has(a.id));
+
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  const handleDragStart = (index: number) => { dragItem.current = index; };
+  const handleDragEnter = (index: number) => { dragOverItem.current = index; };
+
+  const handleDrop = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    const updated = [...selectedAttributes];
+    const [moved] = updated.splice(dragItem.current, 1);
+    updated.splice(dragOverItem.current, 0, moved);
+    dragItem.current = null;
+    dragOverItem.current = null;
+    onOrderChange(updated);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* SELECTED (ordered) */}
+      {selectedAttributes.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <ArrowUpDown size={12} className="text-indigo-500" />
+            <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Actifs — Glisser pour réordonner</span>
+          </div>
+          <div className="space-y-1">
+            {selectedAttributes.map((attr: any, index: number) => (
+              <div
+                key={attr.id}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragEnter={() => handleDragEnter(index)}
+                onDragEnd={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 cursor-grab active:cursor-grabbing group select-none transition-all"
+              >
+                {/* Grip */}
+                <GripVertical size={16} className="text-indigo-300 flex-shrink-0 group-hover:text-indigo-500 transition-colors" />
+
+                {/* Order badge */}
+                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                  {index + 1}
+                </span>
+
+                {/* Name */}
+                <span className="flex-1 text-sm font-semibold text-indigo-900 truncate">{attr.name}</span>
+
+                {/* Type badge */}
+                <DataTypeBadge dataType={attr.data_type} />
+
+                {/* Toggle off */}
+                <button
+                  onClick={() => onToggle(attr.id)}
+                  className="p-1 rounded-lg ml-1 text-indigo-400 hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
+                  title="Retirer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* UNSELECTED */}
+      {unselected.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2 mt-3">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Non actifs</span>
+          </div>
+          <div className="space-y-1">
+            {unselected.map((attr: any) => (
+              <div
+                key={attr.id}
+                onClick={() => onToggle(attr.id)}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-transparent hover:bg-slate-50 hover:border-slate-200 cursor-pointer group select-none transition-all"
+              >
+                <div className="w-4 h-4 rounded-md border-2 border-slate-300 bg-white flex-shrink-0 group-hover:border-indigo-400 transition-colors" />
+                <span className="flex-1 text-sm text-slate-600 truncate group-hover:text-slate-800">{attr.name}</span>
+                <DataTypeBadge dataType={attr.data_type} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {allAttributes.length === 0 && (
+        <p className="text-xs text-center text-slate-400 italic py-4">Créez d'abord des attributs globaux.</p>
+      )}
+    </div>
+  );
+};
+
 // --- Main Component ---
 
 const ConfigView: React.FC = () => {
@@ -46,7 +152,10 @@ const ConfigView: React.FC = () => {
   const [types, setTypes] = useState<any[]>([]);
   const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // configuringType holds the type and its LOCAL ordered attribute list (for editing)
   const [configuringType, setConfiguringType] = useState<any | null>(null);
+
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingTypeMetadata, setEditingTypeMetadata] = useState<any | null>(null);
   const [isAttributeModalOpen, setIsAttributeModalOpen] = useState(false);
@@ -68,6 +177,12 @@ const ConfigView: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const selectTypeForConfig = (type: any) => {
+    // Keep attributes in sort_order when entering config mode
+    const sortedAttrs = [...(type.attributes || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    setConfiguringType({ ...type, attributes: sortedAttrs });
   };
 
   const openCreateTypeModal = () => { setEditingTypeMetadata(null); setIsTypeModalOpen(true); };
@@ -98,20 +213,30 @@ const ConfigView: React.FC = () => {
     } catch { toast.error("Erreur suppression"); }
   };
 
+  // Toggle attribute in configuringType (add at end or remove)
   const toggleAttributeForType = (attrId: number) => {
     if (!configuringType) return;
-    const currentAttrIds = configuringType.attributes.map((a: any) => a.id);
-    const newAttrIds = currentAttrIds.includes(attrId)
-      ? currentAttrIds.filter((id: number) => id !== attrId)
-      : [...currentAttrIds, attrId];
-    setConfiguringType({ ...configuringType, attributes: newAttrIds.map((id: number) => attributes.find(a => a.id === id)).filter(Boolean) });
+    const currentAttrs: any[] = configuringType.attributes;
+    const idx = currentAttrs.findIndex((a: any) => a.id === attrId);
+    if (idx >= 0) {
+      setConfiguringType({ ...configuringType, attributes: currentAttrs.filter((a: any) => a.id !== attrId) });
+    } else {
+      const newAttr = attributes.find(a => a.id === attrId);
+      if (newAttr) setConfiguringType({ ...configuringType, attributes: [...currentAttrs, newAttr] });
+    }
+  };
+
+  const handleOrderChange = (newOrdered: any[]) => {
+    setConfiguringType({ ...configuringType, attributes: newOrdered });
   };
 
   const saveTypeScopes = async () => {
     if (!configuringType) return;
     try {
-      await configService.updateTypeScopes(configuringType.id, configuringType.attributes.map((a: any) => a.id));
-      toast.success("Configuration sauvegardée !");
+      // Send in current order — the API uses array index as sort_order
+      const attrIds = configuringType.attributes.map((a: any) => a.id);
+      await configService.updateTypeScopes(configuringType.id, attrIds);
+      toast.success("Configuration et ordre sauvegardés !");
       setConfiguringType(null);
       fetchConfig();
     } catch { toast.error("Erreur de sauvegarde"); }
@@ -166,7 +291,7 @@ const ConfigView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Configuration Immobilière</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Gérez la structure des données de vos biens immobiliers.</p>
+          <p className="text-slate-500 text-sm mt-0.5">Gérez la structure et l'ordre des données de vos biens immobiliers.</p>
         </div>
         {activeTab === 'types' ? (
           <button onClick={openCreateTypeModal} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-indigo-200 transition-all">
@@ -189,9 +314,11 @@ const ConfigView: React.FC = () => {
               ? 'bg-white text-indigo-700 shadow-sm border border-slate-200'
               : 'text-slate-500 hover:text-slate-700'}`}
           >
-            {tab === 'types' ? <><Layers size={15} /> Types de Biens <span className="ml-1 bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{types.length}</span></>
-              : <><Database size={15} /> Attributs Globaux <span className="ml-1 bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{attributes.length}</span></>
-            }
+            {tab === 'types' ? (
+              <><Layers size={15} /> Types de Biens <span className="ml-1 bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{types.length}</span></>
+            ) : (
+              <><Database size={15} /> Attributs Globaux <span className="ml-1 bg-indigo-100 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{attributes.length}</span></>
+            )}
           </button>
         ))}
       </div>
@@ -213,10 +340,11 @@ const ConfigView: React.FC = () => {
                 <div className="space-y-3">
                   {types.map(type => {
                     const isActive = configuringType?.id === type.id;
+                    const sortedAttrs = [...(type.attributes || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
                     return (
                       <div
                         key={type.id}
-                        onClick={() => setConfiguringType(type)}
+                        onClick={() => selectTypeForConfig(type)}
                         className={`group bg-white rounded-2xl border transition-all duration-200 cursor-pointer overflow-hidden
                           ${isActive
                             ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md'
@@ -233,24 +361,25 @@ const ConfigView: React.FC = () => {
                             <div className="flex items-center gap-2 mb-0.5">
                               <h3 className="text-base font-bold text-slate-800">{type.name}</h3>
                               <span className="text-xs text-slate-400 font-medium bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
-                                {type.attributes?.length || 0} attributs
+                                {sortedAttrs.length} attributs
                               </span>
                             </div>
                             <p className="text-sm text-slate-500 mb-3">{type.description || 'Aucune description'}</p>
 
-                            {/* Attribute chips */}
+                            {/* Attribute chips (sorted by sort_order) */}
                             <div className="flex flex-wrap gap-1.5">
-                              {type.attributes && type.attributes.slice(0, 8).map((attr: any) => (
-                                <span key={attr.id} className="text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full font-medium">
+                              {sortedAttrs.slice(0, 8).map((attr: any, i: number) => (
+                                <span key={attr.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full font-medium">
+                                  <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center">{i + 1}</span>
                                   {attr.name}
                                 </span>
                               ))}
-                              {type.attributes?.length > 8 && (
+                              {sortedAttrs.length > 8 && (
                                 <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-2.5 py-0.5 rounded-full font-medium">
-                                  +{type.attributes.length - 8} autres
+                                  +{sortedAttrs.length - 8} autres
                                 </span>
                               )}
-                              {(!type.attributes || type.attributes.length === 0) && (
+                              {sortedAttrs.length === 0 && (
                                 <span className="text-xs text-slate-400 italic">Aucun attribut associé</span>
                               )}
                             </div>
@@ -258,23 +387,15 @@ const ConfigView: React.FC = () => {
 
                           {/* Actions */}
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={(e) => openEditTypeModal(type, e)}
-                              className="p-2 rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                              title="Modifier"
-                            >
+                            <button onClick={(e) => openEditTypeModal(type, e)} className="p-2 rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Modifier">
                               <Pencil size={16} />
                             </button>
-                            <button
-                              onClick={(e) => handleDeleteType(type.id, e)}
-                              className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                              title="Supprimer"
-                            >
+                            <button onClick={(e) => handleDeleteType(type.id, e)} className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Supprimer">
                               <Trash2 size={16} />
                             </button>
-                            <div className={`flex items-center gap-1 ml-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-700'}`}>
+                            <div className={`flex items-center gap-1.5 ml-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-700'}`}>
                               <SlidersHorizontal size={12} />
-                              {isActive ? 'En cours' : 'Config.'}
+                              {isActive ? 'En cours' : 'Configurer'}
                             </div>
                           </div>
                         </div>
@@ -312,9 +433,7 @@ const ConfigView: React.FC = () => {
                             <span className="font-semibold text-slate-800">{attr.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <DataTypeBadge dataType={attr.data_type} />
-                        </td>
+                        <td className="px-6 py-4"><DataTypeBadge dataType={attr.data_type} /></td>
                         <td className="px-6 py-4">
                           {attr.is_filterable
                             ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full"><Check size={11} strokeWidth={3} /> Oui</span>
@@ -323,20 +442,8 @@ const ConfigView: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-end gap-1">
-                            <button
-                              onClick={() => openEditAttributeModal(attr)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                              title="Modifier"
-                            >
-                              <Edit2 size={15} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAttribute(attr.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Supprimer"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            <button onClick={() => openEditAttributeModal(attr)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Modifier"><Edit2 size={15} /></button>
+                            <button onClick={() => handleDeleteAttribute(attr.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Supprimer"><Trash2 size={15} /></button>
                           </div>
                         </td>
                       </tr>
@@ -349,9 +456,9 @@ const ConfigView: React.FC = () => {
         </div>
 
         {/* --- SIDEBAR PANEL --- */}
-        <div className="w-[320px] flex-shrink-0">
+        <div className="w-[340px] flex-shrink-0">
           {configuringType && activeTab === 'types' ? (
-            /* CONFIG PANEL */
+            /* CONFIG PANEL with Drag-and-Drop */
             <div className="bg-white rounded-2xl border border-indigo-200 shadow-md sticky top-6 overflow-hidden">
               {/* Header */}
               <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4 flex items-center justify-between">
@@ -371,34 +478,17 @@ const ConfigView: React.FC = () => {
 
               {/* Body */}
               <div className="p-4">
-                <p className="text-xs text-slate-500 mb-3">Cochez les attributs qui s'appliquent à ce type de bien.</p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Activez les attributs et <strong className="text-slate-700">glissez-les</strong> pour définir leur ordre d'affichage dans l'app mobile.
+                </p>
 
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-1">
-                  {attributes.length === 0 ? (
-                    <p className="text-xs text-center text-slate-400 italic py-4">Créez d'abord des attributs globaux.</p>
-                  ) : (
-                    attributes.map(attr => {
-                      const isChecked = configuringType.attributes.some((a: any) => a.id === attr.id);
-                      return (
-                        <label
-                          key={attr.id}
-                          onClick={() => toggleAttributeForType(attr.id)}
-                          className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all select-none
-                            ${isChecked ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                        >
-                          {/* Custom checkbox */}
-                          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all
-                            ${isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
-                            {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm font-medium ${isChecked ? 'text-indigo-900' : 'text-slate-700'}`}>{attr.name}</span>
-                          </div>
-                          <DataTypeBadge dataType={attr.data_type} />
-                        </label>
-                      );
-                    })
-                  )}
+                <div className="max-h-[55vh] overflow-y-auto pr-0.5">
+                  <DraggableAttrList
+                    allAttributes={attributes}
+                    selectedAttributes={configuringType.attributes}
+                    onToggle={toggleAttributeForType}
+                    onOrderChange={handleOrderChange}
+                  />
                 </div>
 
                 {/* Footer */}
@@ -407,7 +497,7 @@ const ConfigView: React.FC = () => {
                     onClick={saveTypeScopes}
                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
                   >
-                    <Save size={14} /> Enregistrer
+                    <Save size={14} /> Enregistrer l'ordre
                   </button>
                   <button
                     onClick={() => setConfiguringType(null)}
@@ -433,20 +523,27 @@ const ConfigView: React.FC = () => {
                   <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Créez vos attributs</p>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Définissez les caractéristiques réutilisables (ex: Piscine, Garage, Superficie) dans l'onglet <strong>Attributs Globaux</strong>.</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Définissez les caractéristiques réutilisables dans l'onglet <strong>Attributs Globaux</strong>.</p>
                   </div>
                 </div>
-
                 <div className="flex gap-3">
                   <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Configurez vos types</p>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Créez des types (ex: Villa, Appartement) et cliquez sur une carte pour associer les attributs correspondants.</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Cliquez sur un type pour ouvrir le panneau de configuration et choisir les attributs.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Réordonnez par glisser-déposer</p>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Dans le panneau, glissez les attributs actifs pour définir leur ordre d'affichage dans l'app mobile.</p>
                   </div>
                 </div>
 
-                <div className="p-3 bg-white rounded-xl border border-indigo-100 text-xs text-indigo-800 leading-relaxed">
-                  💡 <span className="font-medium">Astuce :</span> Un attribut comme <em>"Piscine"</em> peut être partagé entre Villa et Hôtel.
+                <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-indigo-100 text-xs text-indigo-800">
+                  <GripVertical size={14} className="text-indigo-400 flex-shrink-0" />
+                  <span><strong>Astuce :</strong> L'ordre sauvegardé ici définit directement l'ordre dans l'application mobile.</span>
                 </div>
               </div>
 
