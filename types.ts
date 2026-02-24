@@ -13,7 +13,7 @@ export interface User {
 export interface Property {
   id: number;
   owner_id: number;
-  status: string;
+  status: { id: number; name: string; color: string } | string;
   created_at: string;
   image_urls: string[];
   attributes: Record<string, any>;
@@ -25,7 +25,7 @@ export interface VisitRequest {
   id: number;
   seeker_id: number;
   property_id: number;
-  visit_date: string;
+  requested_datetime: string;
   status: 'pending' | 'confirmed' | 'rejected' | 'completed' | 'cancelled';
   message?: string;
   created_at: string;

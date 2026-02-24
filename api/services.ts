@@ -37,7 +37,7 @@ export interface VisitRequest {
     id: number;
     seeker_id: number;
     property_id: number;
-    visit_date: string;
+    requested_datetime: string;
     status: 'pending' | 'confirmed' | 'rejected' | 'completed' | 'cancelled';
     message?: string;
     created_at: string;
