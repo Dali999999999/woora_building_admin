@@ -32,14 +32,10 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
 
     useEffect(() => {
         if (isOpen && property) {
-            // Extract status string if property.status is an object
-            let statusValue = 'for_sale';
-            if (property.status) {
-                if (typeof property.status === 'object' && (property.status as any).name) {
-                    statusValue = (property.status as any).name;
-                } else if (typeof property.status === 'string') {
-                    statusValue = property.status;
-                }
+            // Extract status ID strictly
+            let statusValue = property.status_id || 1;
+            if (property.status && typeof property.status === 'object' && (property.status as any).id) {
+                statusValue = (property.status as any).id;
             }
 
             setFormData({
@@ -289,25 +285,25 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Statut</label>
                                             <select
                                                 value={formData.status}
-                                                onChange={(e) => handleInputChange('status', e.target.value)}
+                                                onChange={(e) => handleInputChange('status', Number(e.target.value))}
                                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                                             >
                                                 {propertyStatuses.length > 0 ? (
                                                     propertyStatuses.map((status: any) => (
-                                                        <option key={status.id || status.value} value={status.name || status.value}>
+                                                        <option key={status.id} value={status.id}>
                                                             {status.name || status.label}
                                                         </option>
                                                     ))
                                                 ) : (
                                                     // Fallback si les statuts ne sont pas chargés
                                                     <>
-                                                        <option value="for_sale">À Vendre</option>
-                                                        <option value="for_rent">À Louer</option>
-                                                        <option value="vefa">VEFA</option>
-                                                        <option value="bailler">Bailler</option>
-                                                        <option value="location_vente">Location-vente</option>
-                                                        <option value="sold">Vendu</option>
-                                                        <option value="rented">Loué</option>
+                                                        <option value="1">À Vendre</option>
+                                                        <option value="2">À Louer</option>
+                                                        <option value="3">Vendu</option>
+                                                        <option value="4">Loué</option>
+                                                        <option value="5">VEFA</option>
+                                                        <option value="6">Location-vente</option>
+                                                        <option value="7">Bailler</option>
                                                     </>
                                                 )}
                                             </select>

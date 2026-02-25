@@ -63,7 +63,8 @@ const PropertiesView: React.FC = () => {
     // Tab Filter
     if (activeTab === 'pending' && p.is_validated) return false;
 
-    // Helper to get status string safe
+    // Helper to get status ID and String safe for filtering and searching
+    const statusId = p.status_id || (p.status && typeof p.status === 'object' ? (p.status as any).id : null);
     const statusName = p.status && typeof p.status === 'object' && (p.status as any).name
       ? (p.status as any).name
       : (typeof p.status === 'string' ? p.status : '');
@@ -84,7 +85,7 @@ const PropertiesView: React.FC = () => {
 
     // Status Filter
     // Status filter values are names (e.g., "À Vendre") or legacy codes ("for_sale")
-    const matchesStatus = statusFilter === 'all' || statusName === statusFilter || statusName === statusFilter;
+    const matchesStatus = statusFilter === 'all' || String(statusId) === String(statusFilter);
 
     // Owner Filter
     const ownerDetails = (p as any).owner_details;
@@ -314,7 +315,7 @@ const PropertiesView: React.FC = () => {
             >
               <option value="all">Tous statuts</option>
               {propertyStatuses.map((status: any) => (
-                <option key={status.id || status.value} value={status.name || status.value}>{status.name || status.label}</option>
+                <option key={status.id} value={status.id}>{status.name || status.label}</option>
               ))}
             </select>
             <Filter size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
