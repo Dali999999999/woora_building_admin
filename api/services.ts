@@ -213,6 +213,10 @@ export const configService = {
     deletePropertyType: async (id: number) => {
         await client.delete(`/admin/property_types/${id}`);
     },
+    reorderPropertyTypes: async (orderData: { id: number; display_order: number }[]) => {
+        const response = await client.put('/admin/property_types/reorder', { order_data: orderData });
+        return response.data;
+    },
     createAttribute: async (data: any) => {
         const response = await client.post('/admin/property_attributes', data);
         return response.data;

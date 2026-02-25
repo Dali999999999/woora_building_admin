@@ -156,6 +156,31 @@ const ConfigView: React.FC = () => {
   // configuringType holds the type and its LOCAL ordered attribute list (for editing)
   const [configuringType, setConfiguringType] = useState<any | null>(null);
 
+  // Drag and drop states for types
+  const dragTypeItem = useRef<number | null>(null);
+  const dragTypeOverItem = useRef<number | null>(null);
+
+  const handleTypeDragStart = (index: number) => { dragTypeItem.current = index; };
+  const handleTypeDragEnter = (index: number) => { dragTypeOverItem.current = index; };
+  const handleTypeDrop = async () => {
+    if (dragTypeItem.current === null || dragTypeOverItem.current === null) return;
+    const updated = [...types];
+    const [moved] = updated.splice(dragTypeItem.current, 1);
+    updated.splice(dragTypeOverItem.current, 0, moved);
+    dragTypeItem.current = null;
+    dragTypeOverItem.current = null;
+    setTypes(updated);
+
+    try {
+      const orderData = updated.map((t, idx) => ({ id: t.id, display_order: idx }));
+      await configService.reorderPropertyTypes(orderData);
+      toast.success("Ordre des types sauvegardé");
+    } catch {
+      toast.error("Erreur de sauvegarde de l'ordre");
+      fetchConfig();
+    }
+  };
+
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
   const [editingTypeMetadata, setEditingTypeMetadata] = useState<any | null>(null);
   const [isAttributeModalOpen, setIsAttributeModalOpen] = useState(false);
@@ -338,19 +363,29 @@ const ConfigView: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {types.map(type => {
+                  {types.map((type, index) => {
                     const isActive = configuringType?.id === type.id;
                     const sortedAttrs = [...(type.attributes || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
                     return (
                       <div
                         key={type.id}
+                        draggable
+                        onDragStart={() => handleTypeDragStart(index)}
+                        onDragEnter={() => handleTypeDragEnter(index)}
+                        onDragEnd={handleTypeDrop}
+                        onDragOver={(e) => e.preventDefault()}
                         onClick={() => selectTypeForConfig(type)}
-                        className={`group bg-white rounded-2xl border transition-all duration-200 cursor-pointer overflow-hidden
+                        className={`group bg-white rounded-2xl border transition-all duration-200 cursor-grab active:cursor-grabbing overflow-hidden
                           ${isActive
                             ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md'
                             : 'border-slate-200 hover:border-indigo-300 hover:shadow-sm'}`}
                       >
                         <div className="p-5 flex items-start gap-4">
+                          {/* Grip */}
+                          <div className="flex items-center justify-center mt-2.5 flex-shrink-0 text-slate-300 group-hover:text-indigo-400 transition-colors">
+                            <GripVertical size={20} />
+                          </div>
+
                           {/* Icon */}
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? 'bg-indigo-600' : 'bg-slate-100 group-hover:bg-indigo-50'}`}>
                             <Layers size={18} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600'} />
