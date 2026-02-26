@@ -1,14 +1,96 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Search, RefreshCw, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, RefreshCw, Check, X, GripVertical } from 'lucide-react';
 import { configService } from '../../api/services';
 import toast from 'react-hot-toast';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface PropertyStatus {
     id: number;
     name: string;
     color: string;
     description?: string;
+    display_order?: number;
 }
+
+// Sous-composant pour les éléments sortables
+const SortableStatusRow = ({ status, onEdit, onDelete }: { status: PropertyStatus, onEdit: (s: PropertyStatus) => void, onDelete: (id: number) => void }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+    } = useSortable({ id: status.id.toString() });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <tr ref={setNodeRef} style={style} className="hover:bg-slate-50 transition-colors bg-white">
+            <td className="px-6 py-4 w-10 text-slate-400 cursor-grab active:cursor-grabbing hover:text-slate-600" {...attributes} {...listeners}>
+                <GripVertical size={20} />
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                    <span
+                        className="px-2 py-1 rounded text-xs font-bold text-white shadow-sm"
+                        style={{ backgroundColor: status.color }}
+                    >
+                        {status.name}
+                    </span>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                <div className="flex items-center gap-2">
+                    <div
+                        className="w-6 h-6 rounded border border-slate-200 shadow-sm"
+                        style={{ backgroundColor: status.color }}
+                    ></div>
+                    {status.color}
+                </div>
+            </td>
+            <td className="px-6 py-4 text-slate-500 text-sm max-w-xs truncate">
+                {status.description || '-'}
+            </td>
+            <td className="px-6 py-4 text-right">
+                <div className="flex items-center justify-end gap-2">
+                    <button
+                        onClick={() => onEdit(status)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Modifier"
+                    >
+                        <Edit2 size={16} />
+                    </button>
+                    <button
+                        onClick={() => onDelete(status.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Supprimer"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            </td>
+        </tr>
+    );
+};
 
 const PropertyStatuses: React.FC = () => {
     const [statuses, setStatuses] = useState<PropertyStatus[]>([]);
@@ -16,6 +98,14 @@ const PropertyStatuses: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<Partial<PropertyStatus>>({});
     const [isEditing, setIsEditing] = useState(false);
+
+    // Configuration dnd-kit
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     useEffect(() => {
         fetchStatuses();
@@ -35,6 +125,39 @@ const PropertyStatuses: React.FC = () => {
             toast.error("Impossible de charger les statuts.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id) {
+            setStatuses((items) => {
+                const oldIndex = items.findIndex((item) => item.id.toString() === active.id);
+                const newIndex = items.findIndex((item) => item.id.toString() === over?.id);
+
+                const newStatuses = arrayMove(items, oldIndex, newIndex);
+
+                // Mettre à jour l'ordre localement
+                const updatedStatuses = newStatuses.map((item, index) => ({
+                    ...item,
+                    display_order: index
+                }));
+
+                // Enregistrer en base
+                const orderData = updatedStatuses.map(item => ({
+                    id: item.id,
+                    display_order: item.display_order!
+                }));
+
+                configService.reorderPropertyStatuses(orderData).catch(err => {
+                    console.error("Erreur sauvegarde ordre:", err);
+                    toast.error("Impossible de sauvegarder l'ordre.");
+                    fetchStatuses(); // Rollback en cas d'erreur
+                });
+
+                return updatedStatuses;
+            });
         }
     };
 
@@ -100,69 +223,45 @@ const PropertyStatuses: React.FC = () => {
                     <div className="p-8 text-center text-slate-500">Chargement...</div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
-                                    <th className="px-6 py-4">Nom (Label)</th>
-                                    <th className="px-6 py-4">Couleur</th>
-                                    <th className="px-6 py-4">Description</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {statuses.map((status) => (
-                                    <tr key={status.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <span
-                                                    className="px-2 py-1 rounded text-xs font-bold text-white shadow-sm"
-                                                    style={{ backgroundColor: status.color }}
-                                                >
-                                                    {status.name}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 font-mono text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <div
-                                                    className="w-6 h-6 rounded border border-slate-200 shadow-sm"
-                                                    style={{ backgroundColor: status.color }}
-                                                ></div>
-                                                {status.color}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 text-sm max-w-xs truncate">
-                                            {status.description || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => openModal(status)}
-                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                                                    title="Modifier"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(status.id)}
-                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                                        <th className="px-6 py-4 w-10"></th>
+                                        <th className="px-6 py-4">Nom (Label)</th>
+                                        <th className="px-6 py-4">Couleur</th>
+                                        <th className="px-6 py-4">Description</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
-                                ))}
-                                {statuses.length === 0 && (
-                                    <tr>
-                                        <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                                            Aucun statut défini.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    <SortableContext
+                                        items={statuses.map(s => s.id.toString())}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        {statuses.map((status) => (
+                                            <SortableStatusRow
+                                                key={status.id}
+                                                status={status}
+                                                onEdit={openModal}
+                                                onDelete={handleDelete}
+                                            />
+                                        ))}
+                                    </SortableContext>
+                                    {statuses.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                                Aucun statut défini.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </DndContext>
                     </div>
                 )}
             </div>

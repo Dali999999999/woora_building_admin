@@ -20,6 +20,7 @@ export interface PropertyStatus {
     name: string;
     color: string;
     description?: string;
+    display_order?: number;
 }
 
 export interface Property {
@@ -243,6 +244,10 @@ export const configService = {
     },
     deletePropertyStatus: async (id: number) => {
         await client.delete(`/admin/property-statuses/${id}`);
+    },
+    reorderPropertyStatuses: async (orderData: { id: number; display_order: number }[]) => {
+        const response = await client.put('/admin/property-statuses/reorder', { order_data: orderData });
+        return response.data;
     },
 };
 
