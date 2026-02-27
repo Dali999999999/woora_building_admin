@@ -26,10 +26,11 @@ interface PropertyStatus {
     color: string;
     description?: string;
     display_order?: number;
+    is_deterministic?: boolean;
 }
 
 // Sous-composant pour les éléments sortables
-const SortableStatusRow = ({ status, onEdit, onDelete }: { status: PropertyStatus, onEdit: (s: PropertyStatus) => void, onDelete: (id: number) => void }) => {
+const SortableStatusRow = ({ status, onEdit, onDelete }: { status: PropertyStatus, onEdit: (s: PropertyStatus) => void, onDelete: (id: number) => void | Promise<void> }) => {
     const {
         attributes,
         listeners,
@@ -56,6 +57,11 @@ const SortableStatusRow = ({ status, onEdit, onDelete }: { status: PropertyStatu
                     >
                         {status.name}
                     </span>
+                    {status.is_deterministic && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-red-200">
+                            Masqué
+                        </span>
+                    )}
                 </div>
             </td>
             <td className="px-6 py-4 text-slate-500 font-mono text-sm">
@@ -140,9 +146,9 @@ const PropertyStatuses: React.FC = () => {
 
                 // Mettre à jour l'ordre localement
                 const updatedStatuses = newStatuses.map((item, index) => ({
-                    ...item,
+                    ...(item as PropertyStatus),
                     display_order: index
-                }));
+                } as PropertyStatus));
 
                 // Enregistrer en base
                 const orderData = updatedStatuses.map(item => ({
@@ -193,10 +199,10 @@ const PropertyStatuses: React.FC = () => {
 
     const openModal = (status?: PropertyStatus) => {
         if (status) {
-            setCurrentStatus({ ...status });
+            setCurrentStatus({ ...(status as PropertyStatus) });
             setIsEditing(true);
         } else {
-            setCurrentStatus({ name: '', color: '#000000', description: '' });
+            setCurrentStatus({ name: '', color: '#000000', description: '', is_deterministic: false });
             setIsEditing(false);
         }
         setIsModalOpen(true);
@@ -246,8 +252,8 @@ const PropertyStatuses: React.FC = () => {
                                         {statuses.map((status) => (
                                             <SortableStatusRow
                                                 key={status.id}
-                                                status={status}
-                                                onEdit={openModal}
+                                                status={status as PropertyStatus}
+                                                onEdit={(s) => openModal(s)}
                                                 onDelete={handleDelete}
                                             />
                                         ))}
@@ -329,6 +335,24 @@ const PropertyStatuses: React.FC = () => {
                                     value={currentStatus.description || ''}
                                     onChange={e => setCurrentStatus({ ...currentStatus, description: e.target.value })}
                                 />
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                <input
+                                    type="checkbox"
+                                    id="deterministic-checkbox"
+                                    className="w-5 h-5 text-red-600 border-slate-300 rounded focus:ring-red-500 cursor-pointer"
+                                    checked={!!currentStatus.is_deterministic}
+                                    onChange={e => setCurrentStatus({ ...currentStatus, is_deterministic: e.target.checked })}
+                                />
+                                <div>
+                                    <label htmlFor="deterministic-checkbox" className="block text-sm font-semibold text-red-800 cursor-pointer">
+                                        Statut Masquant (Déterministe)
+                                    </label>
+                                    <p className="text-xs text-red-600 mt-0.5">
+                                        Si coché, les biens immobiliers portant ce statut ne seront <strong>plus visibles</strong> dans les recherches clients et agents.
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="pt-4 flex justify-end gap-3">
