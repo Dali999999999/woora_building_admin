@@ -1,3 +1,4 @@
+import axios from 'axios';
 import client from './client';
 
 export interface User {
@@ -159,14 +160,27 @@ export const propertyService = {
         return response.data;
     },
     uploadImage: async (file: File) => {
+        // 1. Obtenir la signature depuis notre API
+        const sigResponse = await client.get('/cloudinary/signature');
+        const { signature, timestamp, api_key, cloud_name, folder } = sigResponse.data;
+
+        // 2. Upload direct vers Cloudinary (on utilise axios directement pour éviter les interceptors de notre client API)
         const formData = new FormData();
         formData.append('file', file);
-        const response = await client.post('/admin/upload_image', formData, {
+        formData.append('signature', signature);
+        formData.append('timestamp', timestamp.toString());
+        formData.append('api_key', api_key);
+        formData.append('folder', folder);
+
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`;
+        const response = await axios.post(cloudinaryUrl, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
         });
-        return response.data;
+
+        // 3. On retourne un objet avec la clé 'url' pour rester compatible avec l'existant
+        return { url: response.data.secure_url };
     },
 };
 
