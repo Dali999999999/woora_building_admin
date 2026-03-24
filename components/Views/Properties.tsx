@@ -70,13 +70,15 @@ const PropertiesView: React.FC = () => {
       : (typeof p.status === 'string' ? p.status : '');
 
     // Search
-    const location = `${p.attributes?.address || ''} ${p.attributes?.city || ''}`.toLowerCase();
+    const location = `${p.attributes?.address || ''} ${p.attributes?.city || ''} ${p.attributes?.country || ''}`.toLowerCase();
     const title = (p.attributes?.title || p.attributes?.titre || '').toLowerCase();
+    const description = (p.attributes?.description || '').toLowerCase();
     const statusSearch = statusName.toLowerCase();
 
     // Fallback title to status if title missing is weird but keeping legacy logic intent
     const titleMatch = (title || statusSearch).includes(searchTerm.toLowerCase());
-    const matchesSearch = titleMatch || location.includes(searchTerm.toLowerCase()) || statusSearch.includes(searchTerm.toLowerCase());
+    const descMatch = description.includes(searchTerm.toLowerCase());
+    const matchesSearch = titleMatch || descMatch || location.includes(searchTerm.toLowerCase()) || statusSearch.includes(searchTerm.toLowerCase());
 
     // Type Filter
     const typeId = p.type?.id;

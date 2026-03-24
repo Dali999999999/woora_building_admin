@@ -49,8 +49,14 @@ interface DraggableAttrListProps {
 }
 
 const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, selectedAttributes, onOrderChange, onToggle }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
   const selectedIds = new Set(selectedAttributes.map((a: any) => a.id));
   const unselected = allAttributes.filter(a => !selectedIds.has(a.id));
+  
+  const filteredUnselected = unselected.filter((a: any) => 
+    a.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
@@ -70,6 +76,22 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
 
   return (
     <div className="space-y-3">
+      {/* Search Input for Attributes */}
+      <div className="relative mb-3">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          placeholder="Chercher un attribut..."
+          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {/* SELECTED (ordered) */}
       {selectedAttributes.length > 0 && (
         <div>
@@ -123,7 +145,7 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Non actifs</span>
           </div>
           <div className="space-y-1">
-            {unselected.map((attr: any) => (
+            {filteredUnselected.map((attr: any) => (
               <div
                 key={attr.id}
                 onClick={() => onToggle(attr.id)}
@@ -134,6 +156,9 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
                 <DataTypeBadge dataType={attr.data_type} />
               </div>
             ))}
+            {filteredUnselected.length === 0 && searchTerm && (
+              <p className="text-xs text-center text-slate-400 italic py-2">Aucun attribut trouvé pour "{searchTerm}"</p>
+            )}
           </div>
         </div>
       )}
