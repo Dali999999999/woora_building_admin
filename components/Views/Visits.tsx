@@ -17,10 +17,12 @@ const VisitsView: React.FC = () => {
     try {
       const status = filter === 'all' ? undefined : filter;
       const data = await visitService.getVisitRequests(status);
-      setVisits(data);
+      // Service already handles basic extraction, but double-check here
+      setVisits(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
       toast.error("Erreur lors du chargement des visites");
+      setVisits([]);
     } finally {
       setLoading(false);
     }

@@ -43,10 +43,12 @@ const AlertsView: React.FC = () => {
     setLoading(true);
     try {
       const data = await requestService.getAll(showArchived);
-      setAlerts(data);
+      // Service already handles basic extraction, but double-check here
+      setAlerts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
       toast.error("Erreur lors du chargement des alertes");
+      setAlerts([]);
     } finally {
       setLoading(false);
     }

@@ -125,8 +125,15 @@ export const userService = {
 };
 
 export const propertyService = {
-    getProperties: async () => {
-        const response = await client.get('/admin/properties');
+    getProperties: async (page = 1, limit = 20, search = '', status = 'all') => {
+        const response = await client.get('/admin/properties', {
+            params: {
+                page,
+                limit,
+                search,
+                status
+            }
+        });
         return response.data;
     },
     // Additional specialized calls
@@ -188,6 +195,9 @@ export const visitService = {
     getVisitRequests: async (status?: string) => {
         const params = status ? { status } : {};
         const response = await client.get('/admin/visit_requests', { params });
+        if (response.data && Array.isArray(response.data.visit_requests)) {
+            return response.data.visit_requests;
+        }
         return response.data;
     },
     confirmVisit: async (requestId: number) => {
@@ -294,6 +304,9 @@ export const requestService = {
         const response = await client.get('/admin/property_requests', {
             params: { include_archived: includeArchived }
         });
+        if (response.data && Array.isArray(response.data.property_requests)) {
+            return response.data.property_requests;
+        }
         return response.data;
     },
     respond: async (requestId: number, message: string) => {
@@ -320,6 +333,9 @@ export const dashboardService = {
 export const transactionService = {
     getRecents: async () => {
         const response = await client.get('/admin/transactions');
+        if (response.data && Array.isArray(response.data.transactions)) {
+            return response.data.transactions;
+        }
         return response.data;
     }
 };
