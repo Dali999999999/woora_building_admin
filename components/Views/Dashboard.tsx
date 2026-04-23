@@ -32,11 +32,29 @@ const Dashboard: React.FC = () => {
           dashboardService.getStats(),
           transactionService.getRecents()
         ]);
-        setStats(statsRes);
-        setTransactions(txsRes);
+        // Ensure stats has default structure
+        setStats({
+          total_users: statsRes?.total_users || 0,
+          active_properties: statsRes?.active_properties || 0,
+          pending_visits: statsRes?.pending_visits || 0,
+          total_revenue: statsRes?.total_revenue || 0,
+          revenue_chart: Array.isArray(statsRes?.revenue_chart) ? statsRes.revenue_chart : [],
+          user_growth_chart: Array.isArray(statsRes?.user_growth_chart) ? statsRes.user_growth_chart : []
+        });
+        setTransactions(Array.isArray(txsRes) ? txsRes : []);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         toast.error('Erreur lors du chargement des données.');
+        // Set empty data on error
+        setStats({
+          total_users: 0,
+          active_properties: 0,
+          pending_visits: 0,
+          total_revenue: 0,
+          revenue_chart: [],
+          user_growth_chart: []
+        });
+        setTransactions([]);
       } finally {
         setLoading(false);
       }
