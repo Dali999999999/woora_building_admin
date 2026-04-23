@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, User, Phone, Mail, Calendar, CheckCircle, AlertTriangle, Edit, Save, Briefcase } from 'lucide-react';
-import { Property, propertyService } from '../../api/services';
+import { propertyService } from '../../api/services';
+import { Property } from '../../types';
 import toast from 'react-hot-toast';
 
 interface PropertyDetailsModalProps {

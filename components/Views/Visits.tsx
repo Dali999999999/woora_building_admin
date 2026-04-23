@@ -4,7 +4,7 @@ import { visitService } from '../../api/services';
 import toast from 'react-hot-toast';
 
 const VisitsView: React.FC = () => {
-  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'accepted' | 'completed' | 'rejected'>('all');
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

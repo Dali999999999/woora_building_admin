@@ -23,6 +23,7 @@ interface Alert {
   archived_at: string | null;
   archived_by: number | null;
   customer: Customer | null;
+  customer_id?: number;
   property_type_name: string;
   admin_response?: string;
 }

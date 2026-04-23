@@ -45,8 +45,8 @@ const Dashboard: React.FC = () => {
   }, []);
 
   // Data comes from stats now, but we prepare empty defaults if loading
-  const revenueData = stats.revenue_chart || [];
-  const userGrowthData = stats.user_growth_chart || [];
+  const revenueData = Array.isArray(stats.revenue_chart) ? stats.revenue_chart : [];
+  const userGrowthData = Array.isArray(stats.user_growth_chart) ? stats.user_growth_chart : [];
 
   const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
@@ -105,26 +105,24 @@ const Dashboard: React.FC = () => {
               Évolution des Revenus
             </h3>
           </div>
-          <div className="h-72 w-full min-h-[300px]">
-            <div style={{ width: '100%', height: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                  <RechartsTooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="h-72 w-full min-h-[300px] min-w-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueData}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <RechartsTooltip
+                  contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -134,20 +132,18 @@ const Dashboard: React.FC = () => {
             <Users size={20} className="mr-2 text-blue-500" />
             Croissance Utilisateurs (Simulé)
           </h3>
-          <div className="h-72 w-full min-h-[300px]">
-            <div style={{ width: '100%', height: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={userGrowthData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                  <Legend iconType="circle" />
-                  <Bar dataKey="clients" name="Clients" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="owners" name="Propriétaires" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="h-72 w-full min-h-[300px] min-w-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={userGrowthData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} />
+                <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                <Legend iconType="circle" />
+                <Bar dataKey="clients" name="Clients" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="owners" name="Propriétaires" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
