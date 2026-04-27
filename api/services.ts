@@ -125,13 +125,14 @@ export const userService = {
 };
 
 export const propertyService = {
-    getProperties: async (page = 1, limit = 20, search = '', status = 'all') => {
+    getProperties: async (page = 1, limit = 20, search = '', status = 'all', isValidated?: boolean) => {
         const response = await client.get('/admin/properties', {
             params: {
                 page,
                 limit,
                 search,
-                status
+                status_id: status === 'all' ? undefined : status,
+                is_validated: isValidated
             }
         });
         return response.data;

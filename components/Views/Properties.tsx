@@ -50,11 +50,13 @@ const PropertiesView: React.FC = () => {
   const fetchProperties = useCallback(async () => {
     setLoading(true);
     try {
+      const isValidated = activeTab === 'pending' ? false : undefined;
       const data = await propertyService.getProperties(
         page, 
         limit, 
         debouncedSearch, 
-        statusFilter === 'all' ? undefined : statusFilter
+        statusFilter === 'all' ? undefined : statusFilter,
+        isValidated
       );
 
       if (data && Array.isArray(data.properties)) {
@@ -72,7 +74,7 @@ const PropertiesView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter]);
+  }, [page, limit, debouncedSearch, statusFilter, activeTab]);
 
   useEffect(() => {
     fetchProperties();
@@ -95,10 +97,8 @@ const PropertiesView: React.FC = () => {
     loadConfig();
   }, []);
 
-  // Client-side tab filtering for 'pending' (if backend doesn't support specific flag)
-  const displayedProperties = activeTab === 'pending' 
-    ? properties.filter(p => !p.is_validated)
-    : properties;
+  // Use the fetched properties directly since they are now filtered on the backend
+  const displayedProperties = properties;
 
   const handleValidate = async (id: number) => {
     const promise = propertyService.validateProperty(id);
@@ -187,11 +187,11 @@ const PropertiesView: React.FC = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-200 pb-1">
-        <button onClick={() => setActiveTab('pending')} className={`pb-3 px-2 text-sm font-bold relative ${activeTab === 'pending' ? 'text-indigo-600' : 'text-slate-500'}`}>
+        <button onClick={() => { setActiveTab('pending'); setPage(1); }} className={`pb-3 px-2 text-sm font-bold relative ${activeTab === 'pending' ? 'text-indigo-600' : 'text-slate-500'}`}>
           En Attente
           {activeTab === 'pending' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full" />}
         </button>
-        <button onClick={() => setActiveTab('all')} className={`pb-3 px-2 text-sm font-bold relative ${activeTab === 'all' ? 'text-indigo-600' : 'text-slate-500'}`}>
+        <button onClick={() => { setActiveTab('all'); setPage(1); }} className={`pb-3 px-2 text-sm font-bold relative ${activeTab === 'all' ? 'text-indigo-600' : 'text-slate-500'}`}>
           Tous les Biens
           {activeTab === 'all' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full" />}
         </button>
