@@ -53,10 +53,17 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
 
   const selectedIds = new Set(selectedAttributes.map((a: any) => a.id));
   const unselected = allAttributes.filter(a => !selectedIds.has(a.id));
-  
-  const filteredUnselected = unselected.filter((a: any) => 
-    a.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+  // Filter BOTH sections by searchTerm
+  const filteredSelected = searchTerm
+    ? selectedAttributes.filter((a: any) => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : selectedAttributes;
+
+  const filteredUnselected = searchTerm
+    ? unselected.filter((a: any) => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : unselected;
+
+  const noResults = searchTerm !== '' && filteredSelected.length === 0 && filteredUnselected.length === 0;
 
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
@@ -86,60 +93,64 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
         <input
           type="text"
           placeholder="Chercher un attribut..."
-          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+          className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
-      {/* SELECTED (ordered) */}
-      {selectedAttributes.length > 0 && (
+      {/* SELECTED (ordered) — filtered by searchTerm */}
+      {filteredSelected.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2">
             <ArrowUpDown size={12} className="text-indigo-500" />
-            <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Actifs — Glisser pour réordonner</span>
+            <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
+              {searchTerm ? `Actifs — ${filteredSelected.length} résultat(s)` : 'Actifs — Glisser pour réordonner'}
+            </span>
           </div>
           <div className="space-y-1">
-            {selectedAttributes.map((attr: any, index: number) => (
-              <div
-                key={attr.id}
-                draggable
-                onDragStart={() => handleDragStart(index)}
-                onDragEnter={() => handleDragEnter(index)}
-                onDragEnd={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 cursor-grab active:cursor-grabbing group select-none transition-all"
-              >
-                {/* Grip */}
-                <GripVertical size={16} className="text-indigo-300 flex-shrink-0 group-hover:text-indigo-500 transition-colors" />
-
-                {/* Order badge */}
-                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                  {index + 1}
-                </span>
-
-                {/* Name */}
-                <span className="flex-1 text-sm font-semibold text-indigo-900 truncate">{attr.name}</span>
-
-                {/* Type badge */}
-                <DataTypeBadge dataType={attr.data_type} />
-
-                {/* Toggle off */}
-                <button
-                  onClick={() => onToggle(attr.id)}
-                  className="p-1 rounded-lg ml-1 text-indigo-400 hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
-                  title="Retirer"
+            {filteredSelected.map((attr: any) => {
+              const realIndex = selectedAttributes.findIndex((a: any) => a.id === attr.id);
+              return (
+                <div
+                  key={attr.id}
+                  draggable={!searchTerm}
+                  onDragStart={() => { if (!searchTerm) handleDragStart(realIndex); }}
+                  onDragEnter={() => { if (!searchTerm) handleDragEnter(realIndex); }}
+                  onDragEnd={!searchTerm ? handleDrop : undefined}
+                  onDragOver={(e) => e.preventDefault()}
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 ${!searchTerm ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'} group select-none transition-all`}
                 >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+                  <GripVertical size={16} className={`flex-shrink-0 transition-colors ${searchTerm ? 'text-indigo-200' : 'text-indigo-300 group-hover:text-indigo-500'}`} />
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    {realIndex + 1}
+                  </span>
+                  <span className="flex-1 text-sm font-semibold text-indigo-900 truncate">{attr.name}</span>
+                  <DataTypeBadge dataType={attr.data_type} />
+                  <button
+                    onClick={() => onToggle(attr.id)}
+                    className="p-1 rounded-lg ml-1 text-indigo-400 hover:text-rose-500 hover:bg-rose-50 transition-colors flex-shrink-0"
+                    title="Retirer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* UNSELECTED */}
-      {unselected.length > 0 && (
+      {/* UNSELECTED — filtered by searchTerm */}
+      {filteredUnselected.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2 mt-3">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Non actifs</span>
@@ -156,11 +167,13 @@ const DraggableAttrList: React.FC<DraggableAttrListProps> = ({ allAttributes, se
                 <DataTypeBadge dataType={attr.data_type} />
               </div>
             ))}
-            {filteredUnselected.length === 0 && searchTerm && (
-              <p className="text-xs text-center text-slate-400 italic py-2">Aucun attribut trouvé pour "{searchTerm}"</p>
-            )}
           </div>
         </div>
+      )}
+
+      {/* Message global si aucun résultat */}
+      {noResults && (
+        <p className="text-xs text-center text-slate-400 italic py-4">Aucun attribut trouvé pour « {searchTerm} »</p>
       )}
 
       {allAttributes.length === 0 && (
