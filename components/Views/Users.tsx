@@ -123,6 +123,7 @@ const UsersView: React.FC = () => {
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
             <th className="px-6 py-4 font-medium text-slate-500">Utilisateur</th>
+            <th className="px-6 py-4 font-medium text-slate-500">Téléphone</th>
             <th className="px-6 py-4 font-medium text-slate-500">Rôle</th>
             <th className="px-6 py-4 font-medium text-slate-500">Statut</th>
             <th className="px-6 py-4 font-medium text-slate-500">Date d'inscription</th>
@@ -146,6 +147,9 @@ const UsersView: React.FC = () => {
                     <div className="text-sm text-slate-500">{user.email}</div>
                   </div>
                 </div>
+              </td>
+              <td className="px-6 py-4 text-slate-600 text-sm">
+                {user.phone_number || <span className="text-slate-300 italic">Non renseigné</span>}
               </td>
               <td className="px-6 py-4">
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize tracking-wide

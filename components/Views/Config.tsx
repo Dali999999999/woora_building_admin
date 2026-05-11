@@ -191,6 +191,7 @@ const ConfigView: React.FC = () => {
   const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeSearch, setTypeSearch] = useState('');
+  const [attrSearch, setAttrSearch] = useState('');
 
   // configuringType holds the type and its LOCAL ordered attribute list (for editing)
   const [configuringType, setConfiguringType] = useState<any | null>(null);
@@ -518,51 +519,89 @@ const ConfigView: React.FC = () => {
           })()}
 
           {/* ATTRIBUTES TAB */}
-          {activeTab === 'attributes' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              {attributes.length === 0 ? (
-                <EmptyState icon={Database} title="Aucun attribut configuré" description="Créez des attributs réutilisables (ex: Piscine, Garage, Superficie)." />
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Attribut</th>
-                      <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtrable</th>
-                      <th className="px-6 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {attributes.map(attr => (
-                      <tr key={attr.id} className="hover:bg-slate-50/70 group transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Tag size={13} className="text-slate-500" />
-                            </div>
-                            <span className="font-semibold text-slate-800">{attr.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4"><DataTypeBadge dataType={attr.data_type} /></td>
-                        <td className="px-6 py-4">
-                          {attr.is_filterable
-                            ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full"><Check size={11} strokeWidth={3} /> Oui</span>
-                            : <span className="text-xs text-slate-400 font-medium">—</span>
-                          }
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex justify-end gap-1">
-                            <button onClick={() => openEditAttributeModal(attr)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Modifier"><Edit2 size={15} /></button>
-                            <button onClick={() => handleDeleteAttribute(attr.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Supprimer"><Trash2 size={15} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
+          {activeTab === 'attributes' && (() => {
+            const filteredAttrs = attrSearch
+              ? attributes.filter(a => a.name.toLowerCase().includes(attrSearch.toLowerCase()))
+              : attributes;
+            return (
+              <div className="space-y-3">
+                {/* Barre de recherche attributs */}
+                {attributes.length > 0 && (
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher un attribut..."
+                      value={attrSearch}
+                      onChange={(e) => setAttrSearch(e.target.value)}
+                      className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm transition-all"
+                    />
+                    {attrSearch && (
+                      <button
+                        onClick={() => setAttrSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  {attributes.length === 0 ? (
+                    <EmptyState icon={Database} title="Aucun attribut configuré" description="Créez des attributs réutilisables (ex: Piscine, Garage, Superficie)." />
+                  ) : filteredAttrs.length === 0 ? (
+                    <EmptyState icon={Search} title={`Aucun résultat pour « ${attrSearch} »`} description="Essayez un autre terme de recherche." />
+                  ) : (
+                    <>
+                      {attrSearch && (
+                        <div className="px-6 py-2.5 bg-indigo-50 border-b border-indigo-100 text-xs text-indigo-700 font-semibold">
+                          {filteredAttrs.length} résultat{filteredAttrs.length > 1 ? 's' : ''} sur {attributes.length} attributs
+                        </div>
+                      )}
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Attribut</th>
+                            <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtrable</th>
+                            <th className="px-6 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredAttrs.map(attr => (
+                            <tr key={attr.id} className="hover:bg-slate-50/70 group transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <Tag size={13} className="text-slate-500" />
+                                  </div>
+                                  <span className="font-semibold text-slate-800">{attr.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4"><DataTypeBadge dataType={attr.data_type} /></td>
+                              <td className="px-6 py-4">
+                                {attr.is_filterable
+                                  ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full"><Check size={11} strokeWidth={3} /> Oui</span>
+                                  : <span className="text-xs text-slate-400 font-medium">—</span>
+                                }
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex justify-end gap-1">
+                                  <button onClick={() => openEditAttributeModal(attr)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Modifier"><Edit2 size={15} /></button>
+                                  <button onClick={() => handleDeleteAttribute(attr.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Supprimer"><Trash2 size={15} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* --- SIDEBAR PANEL --- */}
