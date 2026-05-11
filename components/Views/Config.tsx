@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers, Plus, Database, Edit2, Trash2, Settings2, Check,
   Pencil, Tag, SlidersHorizontal, X, Save,
-  ToggleLeft, Hash, Type, List, GripVertical, ArrowUpDown
+  ToggleLeft, Hash, Type, List, GripVertical, ArrowUpDown, Search
 } from 'lucide-react';
 import { configService } from '../../api/services';
 import toast from 'react-hot-toast';
@@ -190,6 +190,7 @@ const ConfigView: React.FC = () => {
   const [types, setTypes] = useState<any[]>([]);
   const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [typeSearch, setTypeSearch] = useState('');
 
   // configuringType holds the type and its LOCAL ordered attribute list (for editing)
   const [configuringType, setConfiguringType] = useState<any | null>(null);
@@ -393,92 +394,128 @@ const ConfigView: React.FC = () => {
         <div className="flex-1 min-w-0">
 
           {/* TYPES TAB */}
-          {activeTab === 'types' && (
-            <>
-              {types.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-                  <EmptyState icon={Layers} title="Aucun type configuré" description="Créez votre premier type de bien pour structurer le catalogue." />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {types.map((type, index) => {
-                    const isActive = configuringType?.id === type.id;
-                    const sortedAttrs = [...(type.attributes || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-                    return (
-                      <div
-                        key={type.id}
-                        draggable
-                        onDragStart={() => handleTypeDragStart(index)}
-                        onDragEnter={() => handleTypeDragEnter(index)}
-                        onDragEnd={handleTypeDrop}
-                        onDragOver={(e) => e.preventDefault()}
-                        onClick={() => selectTypeForConfig(type)}
-                        className={`group bg-white rounded-2xl border transition-all duration-200 cursor-grab active:cursor-grabbing overflow-hidden
-                          ${isActive
-                            ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md'
-                            : 'border-slate-200 hover:border-indigo-300 hover:shadow-sm'}`}
+          {activeTab === 'types' && (() => {
+            const filteredTypes = typeSearch
+              ? types.filter(t =>
+                  t.name.toLowerCase().includes(typeSearch.toLowerCase()) ||
+                  (t.description || '').toLowerCase().includes(typeSearch.toLowerCase())
+                )
+              : types;
+            return (
+              <>
+                {/* Barre de recherche types */}
+                {types.length > 0 && (
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher un type de bien..."
+                      value={typeSearch}
+                      onChange={(e) => setTypeSearch(e.target.value)}
+                      className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm transition-all"
+                    />
+                    {typeSearch && (
+                      <button
+                        onClick={() => setTypeSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                       >
-                        <div className="p-5 flex items-start gap-4">
-                          {/* Grip */}
-                          <div className="flex items-center justify-center mt-2.5 flex-shrink-0 text-slate-300 group-hover:text-indigo-400 transition-colors">
-                            <GripVertical size={20} />
-                          </div>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                          {/* Icon */}
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? 'bg-indigo-600' : 'bg-slate-100 group-hover:bg-indigo-50'}`}>
-                            <Layers size={18} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600'} />
-                          </div>
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <h3 className="text-base font-bold text-slate-800">{type.name}</h3>
-                              <span className="text-xs text-slate-400 font-medium bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
-                                {sortedAttrs.length} attributs
-                              </span>
+                {types.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <EmptyState icon={Layers} title="Aucun type configuré" description="Créez votre premier type de bien pour structurer le catalogue." />
+                  </div>
+                ) : filteredTypes.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <EmptyState icon={Search} title={`Aucun résultat pour « ${typeSearch} »`} description="Essayez un autre terme de recherche." />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredTypes.map((type) => {
+                      const index = types.findIndex(t => t.id === type.id);
+                      const isActive = configuringType?.id === type.id;
+                      const sortedAttrs = [...(type.attributes || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+                      return (
+                        <div
+                          key={type.id}
+                          draggable={!typeSearch}
+                          onDragStart={() => { if (!typeSearch) handleTypeDragStart(index); }}
+                          onDragEnter={() => { if (!typeSearch) handleTypeDragEnter(index); }}
+                          onDragEnd={!typeSearch ? handleTypeDrop : undefined}
+                          onDragOver={(e) => e.preventDefault()}
+                          onClick={() => selectTypeForConfig(type)}
+                          className={`group bg-white rounded-2xl border transition-all duration-200 overflow-hidden
+                            ${!typeSearch ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+                            ${isActive
+                              ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md'
+                              : 'border-slate-200 hover:border-indigo-300 hover:shadow-sm'}`}
+                        >
+                          <div className="p-5 flex items-start gap-4">
+                            {/* Grip */}
+                            <div className={`flex items-center justify-center mt-2.5 flex-shrink-0 transition-colors ${typeSearch ? 'text-slate-200' : 'text-slate-300 group-hover:text-indigo-400'}`}>
+                              <GripVertical size={20} />
                             </div>
-                            <p className="text-sm text-slate-500 mb-3">{type.description || 'Aucune description'}</p>
 
-                            {/* Attribute chips (sorted by sort_order) */}
-                            <div className="flex flex-wrap gap-1.5">
-                              {sortedAttrs.slice(0, 8).map((attr: any, i: number) => (
-                                <span key={attr.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full font-medium">
-                                  <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center">{i + 1}</span>
-                                  {attr.name}
-                                </span>
-                              ))}
-                              {sortedAttrs.length > 8 && (
-                                <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-2.5 py-0.5 rounded-full font-medium">
-                                  +{sortedAttrs.length - 8} autres
-                                </span>
-                              )}
-                              {sortedAttrs.length === 0 && (
-                                <span className="text-xs text-slate-400 italic">Aucun attribut associé</span>
-                              )}
+                            {/* Icon */}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? 'bg-indigo-600' : 'bg-slate-100 group-hover:bg-indigo-50'}`}>
+                              <Layers size={18} className={isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600'} />
                             </div>
-                          </div>
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button onClick={(e) => openEditTypeModal(type, e)} className="p-2 rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Modifier">
-                              <Pencil size={16} />
-                            </button>
-                            <button onClick={(e) => handleDeleteType(type.id, e)} className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Supprimer">
-                              <Trash2 size={16} />
-                            </button>
-                            <div className={`flex items-center gap-1.5 ml-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-700'}`}>
-                              <SlidersHorizontal size={12} />
-                              {isActive ? 'En cours' : 'Configurer'}
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <h3 className="text-base font-bold text-slate-800">{type.name}</h3>
+                                <span className="text-xs text-slate-400 font-medium bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                                  {sortedAttrs.length} attributs
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-500 mb-3">{type.description || 'Aucune description'}</p>
+
+                              {/* Attribute chips */}
+                              <div className="flex flex-wrap gap-1.5">
+                                {sortedAttrs.slice(0, 8).map((attr: any, i: number) => (
+                                  <span key={attr.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full font-medium">
+                                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center">{i + 1}</span>
+                                    {attr.name}
+                                  </span>
+                                ))}
+                                {sortedAttrs.length > 8 && (
+                                  <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-2.5 py-0.5 rounded-full font-medium">
+                                    +{sortedAttrs.length - 8} autres
+                                  </span>
+                                )}
+                                {sortedAttrs.length === 0 && (
+                                  <span className="text-xs text-slate-400 italic">Aucun attribut associé</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button onClick={(e) => openEditTypeModal(type, e)} className="p-2 rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Modifier">
+                                <Pencil size={16} />
+                              </button>
+                              <button onClick={(e) => handleDeleteType(type.id, e)} className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Supprimer">
+                                <Trash2 size={16} />
+                              </button>
+                              <div className={`flex items-center gap-1.5 ml-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-700'}`}>
+                                <SlidersHorizontal size={12} />
+                                {isActive ? 'En cours' : 'Configurer'}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* ATTRIBUTES TAB */}
           {activeTab === 'attributes' && (
