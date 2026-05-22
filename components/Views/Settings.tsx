@@ -8,6 +8,9 @@ const SettingsView: React.FC = () => {
     freeVisitPasses: 0,
     passPrice: 0,
     commissionPercentage: 0,
+    freePropertyLimit: 5,
+    subscriptionDuration: 30,
+    subscriptionPrice: 5000,
   });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -19,15 +22,19 @@ const SettingsView: React.FC = () => {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const [visitSettings, commSettings] = await Promise.all([
+      const [visitSettings, commSettings, pubSettings] = await Promise.all([
         settingsService.getVisitSettings(),
-        settingsService.getAgentCommission()
+        settingsService.getAgentCommission(),
+        settingsService.getPublicationSettings()
       ]);
 
       setSettings({
         freeVisitPasses: visitSettings.initial_free_visit_passes,
         passPrice: visitSettings.visit_pass_price,
         commissionPercentage: commSettings.agent_commission_percentage,
+        freePropertyLimit: pubSettings.free_property_publication_limit,
+        subscriptionDuration: pubSettings.property_subscription_duration_days,
+        subscriptionPrice: pubSettings.property_subscription_price,
       });
     } catch (error) {
       console.error(error);
@@ -42,7 +49,8 @@ const SettingsView: React.FC = () => {
     try {
       await Promise.all([
         settingsService.updateVisitSettings(settings.freeVisitPasses, settings.passPrice),
-        settingsService.updateAgentCommission(settings.commissionPercentage)
+        settingsService.updateAgentCommission(settings.commissionPercentage),
+        settingsService.updatePublicationSettings(settings.freePropertyLimit, settings.subscriptionDuration, settings.subscriptionPrice)
       ]);
       toast.success("Paramètres enregistrés");
     } catch (error) {
@@ -107,7 +115,66 @@ const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-8">
+          <div className="border-t border-slate-100 pt-8 mt-8">
+            <h4 className="text-sm font-semibold text-slate-800 mb-4">Abonnement de Publication (Propriétaires & Agents)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700">
+                  Limite de publications gratuites
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={settings.freePropertyLimit}
+                    onChange={(e) => setSettings({ ...settings, freePropertyLimit: parseInt(e.target.value) || 0 })}
+                    className="block w-full rounded-lg border-slate-300 border p-3 pl-4 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm shadow-sm"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">Nombre maximum de biens publiables gratuitement.</p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700">
+                  Prix de l'abonnement
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={settings.subscriptionPrice}
+                    onChange={(e) => setSettings({ ...settings, subscriptionPrice: parseInt(e.target.value) || 0 })}
+                    className="block w-full rounded-lg border-slate-300 border p-3 pl-4 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm shadow-sm"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span className="text-slate-400 text-sm font-bold">FCFA</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Prix pour débloquer les publications illimitées.</p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700">
+                  Durée de l'abonnement
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={settings.subscriptionDuration}
+                    onChange={(e) => setSettings({ ...settings, subscriptionDuration: parseInt(e.target.value) || 0 })}
+                    className="block w-full rounded-lg border-slate-300 border p-3 pl-4 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm shadow-sm"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span className="text-slate-400 text-sm font-bold">Jours</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Durée de validité de l'abonnement en jours.</p>
+              </div>
+
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-8 mt-8">
+            <h4 className="text-sm font-semibold text-slate-800 mb-4">Commissions</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <label className="block text-sm font-medium text-slate-700">

@@ -298,6 +298,18 @@ export const settingsService = {
         });
         return response.data;
     },
+    getPublicationSettings: async () => {
+        const response = await client.get('/admin/settings/publications');
+        return response.data;
+    },
+    updatePublicationSettings: async (freeLimit: number, duration: number, price: number) => {
+        const response = await client.put('/admin/settings/publications', {
+            free_property_publication_limit: freeLimit,
+            property_subscription_duration_days: duration,
+            property_subscription_price: price,
+        });
+        return response.data;
+    },
 };
 
 export const requestService = {
