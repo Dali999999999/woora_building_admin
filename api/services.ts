@@ -11,6 +11,10 @@ export interface User {
     is_verified: boolean;
     is_suspended?: boolean;
     suspension_reason?: string;
+    banned_by_admin_id?: number;
+    suspension_attachment_url?: string;
+    nationality?: string;
+    gender?: string;
     profile_image_url?: string;
     created_at: string;
 }
@@ -107,8 +111,8 @@ export const userService = {
         });
         return response.data;
     },
-    suspendUser: async (id: number, reason: string) => {
-        const response = await client.put(`/admin/users/${id}/suspend`, { reason });
+    suspendUser: async (id: number, reason: string, attachmentUrl?: string) => {
+        const response = await client.put(`/admin/users/${id}/suspend`, { reason, attachment_url: attachmentUrl });
         return response.data;
     },
     unsuspendUser: async (id: number) => {

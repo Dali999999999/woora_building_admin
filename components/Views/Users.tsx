@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Filter, MoreVertical, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Ban, ShieldCheck, Globe, User2 } from 'lucide-react';
 import { userService } from '../../api/services';
 import type { User } from '../../api/services';
 import toast from 'react-hot-toast';
-import ReasonModal from '../Modals/ReasonModal'; // Import ReasonModal
+import ReasonModal from '../Modals/ReasonModal';
+import SuspensionModal from '../Modals/SuspensionModal';
 
 const UsersView: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -19,11 +20,22 @@ const UsersView: React.FC = () => {
   const [filterRole, setFilterRole] = useState<'all' | 'owner' | 'agent' | 'customer'>('all');
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false); // Renamed for clarity
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Compteurs par rôles (Tâche 18)
+  const [counts, setCounts] = useState({
+    all: 0,
+    customer: 0,
+    owner: 0,
+    agent: 0,
+  });
 
   // Delete State
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Suspension State (Tâche 16)
+  const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
 
   // Debounce search term
   useEffect(() => {
@@ -38,6 +50,25 @@ const UsersView: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [filterRole]);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [resAll, resCust, resOwner, resAgent] = await Promise.all([
+        userService.getUsers(1, 1, '', 'all'),
+        userService.getUsers(1, 1, '', 'customer'),
+        userService.getUsers(1, 1, '', 'owner'),
+        userService.getUsers(1, 1, '', 'agent'),
+      ]);
+      setCounts({
+        all: resAll?.total || 0,
+        customer: resCust?.total || 0,
+        owner: resOwner?.total || 0,
+        agent: resAgent?.total || 0,
+      });
+    } catch (error) {
+      console.error("Impossible de charger les compteurs: ", error);
+    }
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -56,17 +87,43 @@ const UsersView: React.FC = () => {
         setTotalPages(1);
         setTotalUsers(0);
       }
+      fetchCounts();
     } catch (error) {
       console.error(error);
       toast.error("Impossible de charger les utilisateurs");
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, filterRole]);
+  }, [page, limit, debouncedSearch, filterRole, fetchCounts]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  const confirmSuspension = async (reason: string, attachmentUrl?: string) => {
+    if (!selectedUser) return;
+    try {
+      await userService.suspendUser(selectedUser.id, reason, attachmentUrl);
+      toast.success(`Utilisateur ${selectedUser.email} suspendu avec succès.`);
+      fetchUsers();
+      setShowDetailModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Impossible de suspendre l'utilisateur.");
+    }
+  };
+
+  const handleUnsuspend = async (user: User) => {
+    try {
+      await userService.unsuspendUser(user.id);
+      toast.success(`Suspension levée pour ${user.email}.`);
+      fetchUsers();
+      setShowDetailModal(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Impossible de lever la suspension.");
+    }
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, user: User) => {
     e.stopPropagation(); // Prevent row click
@@ -88,6 +145,7 @@ const UsersView: React.FC = () => {
     try {
       await promise;
       fetchUsers();
+      fetchCounts();
       setIsDeleteModalOpen(false);
       setShowDetailModal(false); // Also close detail modal if open
     } catch (error) {
@@ -204,22 +262,37 @@ const UsersView: React.FC = () => {
             placeholder="Rechercher par nom, email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-slate-800"
           />
         </div>
-        <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
-          <Filter size={20} className="text-slate-400" />
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value as any)}
-            className="border-none bg-transparent focus:ring-0 text-slate-600 font-medium cursor-pointer py-2 pl-2 pr-8"
-          >
-            <option value="all">Tous les rôles</option>
-            <option value="customer">Clients</option>
-            <option value="owner">Propriétaires</option>
-            <option value="agent">Agents</option>
-          </select>
-        </div>
+      </div>
+
+      {/* Barre d'onglets premium (Tabs) avec compteurs en temps réel (Tâche 18) */}
+      <div className="flex border-b border-slate-200 gap-6 bg-slate-50/50 p-2 rounded-lg border">
+        {(['all', 'customer', 'owner', 'agent'] as const).map((role) => {
+          const isActive = filterRole === role;
+          const label = role === 'all' ? 'Tous' : role === 'customer' ? 'Clients' : role === 'owner' ? 'Propriétaires' : 'Agents';
+          const count = role === 'all' ? counts.all : role === 'customer' ? counts.customer : role === 'owner' ? counts.owner : counts.agent;
+          
+          return (
+            <button
+              key={role}
+              onClick={() => setFilterRole(role)}
+              className={`pb-2 pt-1 px-4 font-semibold text-sm transition-all rounded-lg ${
+                isActive 
+                  ? 'bg-indigo-600 text-white shadow-md' 
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+              }`}
+            >
+              {label}
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -280,6 +353,29 @@ const UsersView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Informations du Profil (Tâche 24) */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="text-slate-400">
+                    <Globe size={18} />
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-400 uppercase font-bold tracking-wider">Nationalité</span>
+                    <span className="font-semibold text-slate-700">{selectedUser.nationality || <span className="italic text-slate-300">Non spécifiée</span>}</span>
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+                  <div className="text-slate-400">
+                    <User2 size={18} />
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-400 uppercase font-bold tracking-wider">Genre / Sexe</span>
+                    <span className="font-semibold text-slate-700 capitalize">{selectedUser.gender || <span className="italic text-slate-300">Non spécifié</span>}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* État du Compte */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="block text-xs text-slate-400 uppercase font-bold mb-1 tracking-wider">Statut du compte</span>
@@ -292,18 +388,59 @@ const UsersView: React.FC = () => {
                   <span className="font-semibold text-slate-700">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
+
+              {/* Détails du Bannissement / Suspension (Tâche 16) */}
+              {selectedUser.is_suspended && (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-rose-800 font-bold">
+                    <Ban size={16} />
+                    <span>Compte Suspendu / Banni</span>
+                  </div>
+                  <p className="text-rose-700"><strong>Motif :</strong> {selectedUser.suspension_reason || "Non spécifié."}</p>
+                  {selectedUser.banned_by_admin_id && (
+                    <p className="text-rose-600 text-xs"><strong>Banni par l'Admin :</strong> #{selectedUser.banned_by_admin_id}</p>
+                  )}
+                  {selectedUser.suspension_attachment_url && (
+                    <a 
+                      href={selectedUser.suspension_attachment_url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 underline font-semibold mt-1"
+                    >
+                      📎 Voir la pièce jointe (Preuve de violation)
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="p-5 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-5 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 flex-wrap">
               <button
                 onClick={(e) => handleDeleteClick(e, selectedUser)}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
               >
-                <Trash2 size={16} className="mr-2" /> Supprimer le compte
+                <Trash2 size={16} className="mr-2" /> Supprimer
               </button>
+
+              {/* Action Suspendre / Activer (Tâche 16) */}
+              {selectedUser.is_suspended ? (
+                <button
+                  onClick={() => handleUnsuspend(selectedUser)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                >
+                  <ShieldCheck size={16} className="mr-2" /> Réactiver
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsSuspendModalOpen(true)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                >
+                  <Ban size={16} className="mr-2" /> Suspendre
+                </button>
+              )}
 
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
               >
                 Fermer
               </button>
@@ -322,6 +459,13 @@ const UsersView: React.FC = () => {
         label="Motif de la suppression (Optionnel)"
         confirmLabel="Supprimer définitivement"
         isDanger={true}
+      />
+
+      {/* Suspension Modal (Tâche 16) */}
+      <SuspensionModal
+        isOpen={isSuspendModalOpen}
+        onClose={() => setIsSuspendModalOpen(false)}
+        onConfirm={confirmSuspension}
       />
     </div>
   );
