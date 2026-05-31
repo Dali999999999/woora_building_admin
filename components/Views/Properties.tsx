@@ -284,6 +284,7 @@ const PropertiesView: React.FC = () => {
           onDelete={confirmDelete}
           onUpdate={handlePropertyUpdate}
           propertyStatuses={propertyStatuses as any}
+          propertyTypes={propertyTypes}
         />
       )}
 

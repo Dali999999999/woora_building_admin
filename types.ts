@@ -69,6 +69,14 @@ export interface VisitRequest {
   property?: Property;
   property_title?: string;
   customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  owner_name?: string;
+  owner_phone?: string;
+  agent_contact?: {
+    name: string;
+    phone: string;
+  } | null;
   referral?: {
     id: number;
     code: string;

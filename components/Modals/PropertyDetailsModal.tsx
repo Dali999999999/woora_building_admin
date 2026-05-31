@@ -13,6 +13,7 @@ interface PropertyDetailsModalProps {
     onUpdate?: (updatedProperty: Property) => void;
     initialEditMode?: boolean;
     propertyStatuses?: { value: string, label: string }[];
+    propertyTypes?: any[];
 }
 
 const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
@@ -23,7 +24,8 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
     onDelete,
     onUpdate,
     initialEditMode = false,
-    propertyStatuses = []
+    propertyStatuses = [],
+    propertyTypes = []
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
@@ -39,11 +41,20 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                 statusValue = (property.status as any).id;
             }
 
+            // Extract property type ID
+            let typeValue = (property as any).property_type_id;
+            if (property.type && typeof property.type === 'object' && (property.type as any).id) {
+                typeValue = (property.type as any).id;
+            } else if (property.attributes?.property_type_id) {
+                typeValue = property.attributes.property_type_id;
+            }
+
             setFormData({
                 title: property.attributes?.title || property.attributes?.titre || '',
                 description: property.attributes?.description || '',
                 price: property.attributes?.price || 0,
                 status: statusValue,
+                property_type_id: typeValue || 1,
                 address: property.attributes?.address || '',
                 city: property.attributes?.city || '',
                 attributes: { ...property.attributes }
@@ -79,7 +90,8 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                     price: Number(formData.price),
                     address: formData.address,
                     city: formData.city,
-                    status: formData.status
+                    status: formData.status,
+                    property_type_id: Number(formData.property_type_id)
                 },
                 status: formData.status // Also at root
             };
@@ -199,6 +211,11 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                     <CheckCircle size={12} /> Validé
                                 </span>
                             )}
+                            {property.type && (
+                                <span className="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1 rounded-full font-bold">
+                                    {typeof property.type === 'object' ? (property.type as any).name : property.type}
+                                </span>
+                            )}
                         </h2>
                         <p className="text-sm text-slate-500">ID: #{property.id} • Créé le {new Date(property.created_at).toLocaleDateString()}</p>
                     </div>
@@ -272,7 +289,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Prix (FCFA)</label>
                                             <input
@@ -305,6 +322,31 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                                         <option value="5">VEFA</option>
                                                         <option value="6">Location-vente</option>
                                                         <option value="7">Bailler</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Type de Bien</label>
+                                            <select
+                                                value={formData.property_type_id}
+                                                onChange={(e) => handleInputChange('property_type_id', Number(e.target.value))}
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold text-slate-700"
+                                            >
+                                                {propertyTypes && propertyTypes.length > 0 ? (
+                                                    propertyTypes.map((type: any) => (
+                                                        <option key={type.id} value={type.id}>
+                                                            {type.name}
+                                                        </option>
+                                                    ))
+                                                ) : (
+                                                    <>
+                                                        <option value="1">Appartement</option>
+                                                        <option value="2">Villa</option>
+                                                        <option value="3">Studio</option>
+                                                        <option value="4">Chambre</option>
+                                                        <option value="5">Bureau</option>
+                                                        <option value="6">Terrain</option>
                                                     </>
                                                 )}
                                             </select>
