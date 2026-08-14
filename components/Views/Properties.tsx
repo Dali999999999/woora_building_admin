@@ -109,8 +109,16 @@ const PropertiesView: React.FC = () => {
     });
     try {
       await promise;
-      setProperties(props => props.map(p => p.id === id ? { ...p, is_validated: true } : p));
-    } catch (error) { console.error(error); }
+      if (activeTab === 'pending') {
+        setProperties(props => props.filter(p => p.id !== id));
+        setTotalProperties(prev => Math.max(0, prev - 1));
+      } else {
+        setProperties(props => props.map(p => p.id === id ? { ...p, is_validated: true } : p));
+      }
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   };
 
   const confirmInvalidation = async (reason: string) => {

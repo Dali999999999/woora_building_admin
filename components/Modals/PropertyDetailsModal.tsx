@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, User, Phone, Mail, Calendar, CheckCircle, AlertTriangle, Edit, Save, Briefcase } from 'lucide-react';
+import { X, MapPin, User, Phone, Mail, Calendar, CheckCircle, AlertTriangle, Edit, Save, Briefcase, Loader2 } from 'lucide-react';
 import { propertyService } from '../../api/services';
 import { Property } from '../../types';
 import toast from 'react-hot-toast';
@@ -30,6 +30,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
+    const [validating, setValidating] = useState(false);
     const [editImages, setEditImages] = useState<string[]>([]);
     const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -184,6 +185,19 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
             toast.error("Erreur lors de la finalisation");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleValidateClick = async () => {
+        if (!property || validating) return;
+        setValidating(true);
+        try {
+            await onValidate(property.id);
+            onClose();
+        } catch (error) {
+            console.error("Validation error:", error);
+        } finally {
+            setValidating(false);
         }
     };
 
@@ -547,11 +561,21 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({
                                 <div className="p-6 space-y-3">
                                     {!property.is_validated && (
                                         <button
-                                            onClick={() => onValidate(property.id)}
-                                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-indigo-200 shadow-md transition-all flex items-center justify-center gap-2 group"
+                                            onClick={handleValidateClick}
+                                            disabled={validating || saving}
+                                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-indigo-200 shadow-md transition-all flex items-center justify-center gap-2 group"
                                         >
-                                            <CheckCircle size={18} className="group-hover:scale-110 transition-transform" />
-                                            Valider ce bien
+                                            {validating ? (
+                                                <>
+                                                    <Loader2 size={18} className="animate-spin" />
+                                                    Validation en cours...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle size={18} className="group-hover:scale-110 transition-transform" />
+                                                    Valider ce bien
+                                                </>
+                                            )}
                                         </button>
                                     )}
 
