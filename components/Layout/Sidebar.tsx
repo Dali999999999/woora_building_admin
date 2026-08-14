@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, Building2, CalendarDays, Bell, Settings, Layers, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, CalendarDays, Bell, Settings, Layers, Trash2 } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -14,9 +14,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isMobile
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'properties', label: 'Biens Immobiliers', icon: Building2 },
     { id: 'visits', label: 'Demandes de Visite', icon: CalendarDays },
-    { id: 'statuses', label: 'Gestion des Statuts', icon: Layers }, // Renamed/New icon suggested? Layers is used for Config. Let's use something else or re-use Layers if Config is Types & Attributes.
+    { id: 'statuses', label: 'Gestion des Statuts', icon: Layers },
     { id: 'alerts', label: 'Alertes Client', icon: Bell },
     { id: 'config', label: 'Types & Attributs', icon: Layers },
+    { id: 'trash', label: 'Corbeille', icon: Trash2 },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ];
 

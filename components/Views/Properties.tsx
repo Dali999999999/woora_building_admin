@@ -140,9 +140,9 @@ const PropertiesView: React.FC = () => {
     if (!propertyToDelete) return;
     const promise = propertyService.deleteProperty(propertyToDelete.id, reason);
     toast.promise(promise, {
-      loading: 'Suppression en cours...',
-      success: 'Bien supprimé.',
-      error: 'Erreur lors de la suppression'
+      loading: 'Archivage en cours...',
+      success: 'Bien archivé avec succès.',
+      error: 'Erreur lors de l\'archivage'
     });
     try {
       await promise;
@@ -297,7 +297,7 @@ const PropertiesView: React.FC = () => {
       )}
 
       <ReasonModal isOpen={isReasonModalOpen} onClose={() => setIsReasonModalOpen(false)} onConfirm={confirmInvalidation} title="Suspendre le bien" description="Ce bien ne sera plus visible." />
-      <ReasonModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Supprimer ?" description="Cette action est irréversible (Soft Delete)." isDanger={true} />
+      <ReasonModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Archiver le bien ?" description="Ce bien sera désactivé de l'application et conservé dans les archives d'administration." confirmLabel="Archiver" isDanger={true} />
     </div>
   );
 };

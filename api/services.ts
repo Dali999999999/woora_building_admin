@@ -99,14 +99,36 @@ export const authService = {
     },
 };
 
+export interface User {
+    id: number;
+    email: string;
+    display_email?: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+    phone_number: string;
+    is_verified: boolean;
+    is_suspended?: boolean;
+    suspension_reason?: string;
+    banned_by_admin_id?: number;
+    suspension_attachment_url?: string;
+    nationality?: string;
+    gender?: string;
+    profile_image_url?: string;
+    created_at: string;
+    deleted_at?: string | null;
+    deletion_reason?: string | null;
+}
+
 export const userService = {
-    getUsers: async (page = 1, limit = 20, search = '', role = 'all') => {
+    getUsers: async (page = 1, limit = 20, search = '', role = 'all', status = 'active') => {
         const response = await client.get('/admin/users', {
             params: {
                 page,
                 limit,
                 search,
-                role
+                role,
+                status
             }
         });
         return response.data;
@@ -120,10 +142,13 @@ export const userService = {
         return response.data;
     },
     deleteUser: async (id: number, reason?: string) => {
-        // DELETE with body is supported by axios but requires `data` property
         const response = await client.delete(`/admin/users/${id}`, {
             data: { reason }
         });
+        return response.data;
+    },
+    restoreUser: async (id: number) => {
+        const response = await client.post(`/admin/users/${id}/restore`);
         return response.data;
     },
 };
@@ -139,6 +164,16 @@ export const propertyService = {
                 is_validated: isValidated
             }
         });
+        return response.data;
+    },
+    getDeletedProperties: async (page = 1, limit = 20, search = '') => {
+        const response = await client.get('/admin/trash/properties', {
+            params: { page, limit, search }
+        });
+        return response.data;
+    },
+    restoreProperty: async (id: number) => {
+        const response = await client.post(`/admin/properties/${id}/restore`);
         return response.data;
     },
     // Additional specialized calls

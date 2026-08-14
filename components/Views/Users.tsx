@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Ban, ShieldCheck, Globe, User2 } from 'lucide-react';
+import { Search, Filter, Trash2, ChevronLeft, ChevronRight, Loader2, Ban, ShieldCheck, Globe, User2, Archive, RotateCcw } from 'lucide-react';
 import { userService } from '../../api/services';
 import type { User } from '../../api/services';
 import toast from 'react-hot-toast';
@@ -18,11 +18,12 @@ const UsersView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterRole, setFilterRole] = useState<'all' | 'owner' | 'agent' | 'customer'>('all');
+  const [statusTab, setStatusTab] = useState<'active' | 'archived'>('active');
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Compteurs par rôles (Tâche 18)
+  // Compteurs par rôles
   const [counts, setCounts] = useState({
     all: 0,
     customer: 0,
@@ -30,11 +31,11 @@ const UsersView: React.FC = () => {
     agent: 0,
   });
 
-  // Delete State
+  // Archive / Delete State
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // Suspension State (Tâche 16)
+  // Suspension State
   const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
 
   // Debounce search term
@@ -49,15 +50,15 @@ const UsersView: React.FC = () => {
   // Reset page when filter changes
   useEffect(() => {
     setPage(1);
-  }, [filterRole]);
+  }, [filterRole, statusTab]);
 
   const fetchCounts = useCallback(async () => {
     try {
       const [resAll, resCust, resOwner, resAgent] = await Promise.all([
-        userService.getUsers(1, 1, '', 'all'),
-        userService.getUsers(1, 1, '', 'customer'),
-        userService.getUsers(1, 1, '', 'owner'),
-        userService.getUsers(1, 1, '', 'agent'),
+        userService.getUsers(1, 1, '', 'all', statusTab),
+        userService.getUsers(1, 1, '', 'customer', statusTab),
+        userService.getUsers(1, 1, '', 'owner', statusTab),
+        userService.getUsers(1, 1, '', 'agent', statusTab),
       ]);
       setCounts({
         all: resAll?.total || 0,
@@ -68,12 +69,12 @@ const UsersView: React.FC = () => {
     } catch (error) {
       console.error("Impossible de charger les compteurs: ", error);
     }
-  }, []);
+  }, [statusTab]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await userService.getUsers(page, limit, debouncedSearch, filterRole);
+      const data = await userService.getUsers(page, limit, debouncedSearch, filterRole, statusTab);
       if (Array.isArray(data)) {
         setUsers(data);
         setTotalPages(1);
@@ -94,7 +95,7 @@ const UsersView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, filterRole, fetchCounts]);
+  }, [page, limit, debouncedSearch, filterRole, statusTab, fetchCounts]);
 
   useEffect(() => {
     fetchUsers();
@@ -104,7 +105,8 @@ const UsersView: React.FC = () => {
     if (!selectedUser) return;
     try {
       await userService.suspendUser(selectedUser.id, reason, attachmentUrl);
-      toast.success(`Utilisateur ${selectedUser.email} suspendu avec succès.`);
+      const email = selectedUser.display_email || selectedUser.email;
+      toast.success(`Utilisateur ${email} suspendu avec succès.`);
       fetchUsers();
       setShowDetailModal(false);
     } catch (error) {
@@ -116,7 +118,8 @@ const UsersView: React.FC = () => {
   const handleUnsuspend = async (user: User) => {
     try {
       await userService.unsuspendUser(user.id);
-      toast.success(`Suspension levée pour ${user.email}.`);
+      const email = user.display_email || user.email;
+      toast.success(`Suspension levée pour ${email}.`);
       fetchUsers();
       setShowDetailModal(false);
     } catch (error) {
@@ -131,15 +134,15 @@ const UsersView: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = async (reason: string) => {
+  const confirmArchive = async (reason: string) => {
     if (!userToDelete) return;
 
     const promise = userService.deleteUser(userToDelete.id, reason);
 
     toast.promise(promise, {
-      loading: 'Suppression en cours...',
-      success: 'Utilisateur supprimé (Soft Delete) avec succès.',
-      error: 'Erreur lors de la suppression.'
+      loading: 'Archivage en cours...',
+      success: 'Utilisateur archivé avec succès.',
+      error: 'Erreur lors de l\'archivage.'
     });
 
     try {
@@ -147,14 +150,42 @@ const UsersView: React.FC = () => {
       fetchUsers();
       fetchCounts();
       setIsDeleteModalOpen(false);
-      setShowDetailModal(false); // Also close detail modal if open
+      setShowDetailModal(false);
     } catch (error) {
       console.error(error);
     }
   };
 
+  const handleRestoreUser = async (user: User) => {
+    const promise = userService.restoreUser(user.id);
+    const email = user.display_email || user.email;
 
-  // Memoize empty state or content to avoid flickering
+    toast.promise(promise, {
+      loading: 'Restauration en cours...',
+      success: `Compte ${email} et ses annonces restaurés avec succès !`,
+      error: 'Erreur lors de la restauration.'
+    });
+
+    try {
+      await promise;
+      fetchUsers();
+      fetchCounts();
+      setShowDetailModal(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const getCleanEmail = (user: User) => {
+    if (user.display_email) return user.display_email;
+    if (user.email && user.email.startsWith('deleted_')) {
+      const parts = user.email.split('_', 2);
+      return parts.length >= 3 ? parts[2] : user.email;
+    }
+    return user.email;
+  };
+
+  // Content rendering
   const content = useMemo(() => {
     const safeUsers = Array.isArray(users) ? users : [];
 
@@ -170,8 +201,10 @@ const UsersView: React.FC = () => {
     if (safeUsers.length === 0) {
       return (
         <div className="p-12 text-center text-slate-500">
-          <p className="text-lg font-medium">Aucun utilisateur trouvé</p>
-          <p className="text-sm">Essayez de modifier vos filtres</p>
+          <p className="text-lg font-medium">
+            {statusTab === 'archived' ? 'Aucun utilisateur archivé' : 'Aucun utilisateur trouvé'}
+          </p>
+          <p className="text-sm">Essayez de modifier vos filtres de recherche</p>
         </div>
       );
     }
@@ -184,73 +217,127 @@ const UsersView: React.FC = () => {
             <th className="px-6 py-4 font-medium text-slate-500">Téléphone</th>
             <th className="px-6 py-4 font-medium text-slate-500">Rôle</th>
             <th className="px-6 py-4 font-medium text-slate-500">Statut</th>
-            <th className="px-6 py-4 font-medium text-slate-500">Date d'inscription</th>
+            <th className="px-6 py-4 font-medium text-slate-500">
+              {statusTab === 'archived' ? 'Date d\'archivage' : 'Date d\'inscription'}
+            </th>
+            {statusTab === 'archived' && (
+              <th className="px-6 py-4 font-medium text-slate-500">Motif d'archivage</th>
+            )}
             <th className="px-6 py-4 font-medium text-slate-500 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {users.map(user => (
-            <tr key={user.id} className="group hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => { setSelectedUser(user); setShowDetailModal(true); }}>
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
-                    {user.profile_image_url ? (
-                      <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      (user.first_name?.[0] || user.email[0]).toUpperCase()
-                    )}
+          {users.map(user => {
+            const cleanEmail = getCleanEmail(user);
+            return (
+              <tr key={user.id} className="group hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => { setSelectedUser(user); setShowDetailModal(true); }}>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden shadow-sm">
+                      {user.profile_image_url ? (
+                        <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        (user.first_name?.[0] || cleanEmail[0]).toUpperCase()
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-800">{user.first_name} {user.last_name}</div>
+                      <div className="text-sm text-slate-500">{cleanEmail}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-semibold text-slate-800">{user.first_name} {user.last_name}</div>
-                    <div className="text-sm text-slate-500">{user.email}</div>
-                  </div>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-slate-600 text-sm">
-                {user.phone_number || <span className="text-slate-300 italic">Non renseigné</span>}
-              </td>
-              <td className="px-6 py-4">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize tracking-wide
-                                        ${user.role === 'admin' ? 'bg-slate-800 text-white' :
-                    user.role === 'agent' ? 'bg-orange-100 text-orange-700' :
-                      user.role === 'owner' ? 'bg-purple-100 text-purple-700' :
-                        'bg-blue-100 text-blue-700'
-                  }`}>
-                  {user.role}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                {user.is_verified ? (
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-emerald-200">Vérifié</span>
-                ) : (
-                  <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-amber-200">Non vérifié</span>
+                </td>
+                <td className="px-6 py-4 text-slate-600 text-sm">
+                  {user.phone_number || <span className="text-slate-300 italic">Non renseigné</span>}
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize tracking-wide
+                    ${user.role === 'admin' ? 'bg-slate-800 text-white' :
+                      user.role === 'agent' ? 'bg-orange-100 text-orange-700' :
+                        user.role === 'owner' ? 'bg-purple-100 text-purple-700' :
+                          'bg-blue-100 text-blue-700'
+                    }`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  {statusTab === 'archived' ? (
+                    <span className="text-purple-700 bg-purple-50 px-2.5 py-1 rounded text-xs font-semibold ring-1 ring-purple-200 flex items-center gap-1 w-max">
+                      <Archive size={12} /> Archivé
+                    </span>
+                  ) : user.is_verified ? (
+                    <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-emerald-200">Vérifié</span>
+                  ) : (
+                    <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded text-xs font-medium ring-1 ring-amber-200">Non vérifié</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-slate-600 text-sm font-mono">
+                  {statusTab === 'archived' && user.deleted_at
+                    ? new Date(user.deleted_at).toLocaleDateString()
+                    : new Date(user.created_at).toLocaleDateString()}
+                </td>
+                {statusTab === 'archived' && (
+                  <td className="px-6 py-4 text-slate-600 text-sm italic max-w-xs truncate">
+                    {user.deletion_reason || 'Non renseigné'}
+                  </td>
                 )}
-              </td>
-              <td className="px-6 py-4 text-slate-600 text-sm font-mono">
-                {new Date(user.created_at).toLocaleDateString()}
-              </td>
-              <td className="px-6 py-4 text-right">
-                <button
-                  onClick={(e) => handleDeleteClick(e, user)}
-                  className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
-                  title="Supprimer l'utilisateur"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </td>
-            </tr>
-          ))}
+                <td className="px-6 py-4 text-right">
+                  {statusTab === 'archived' ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRestoreUser(user); }}
+                      className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                      title="Restaurer cet utilisateur"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => handleDeleteClick(e, user)}
+                      className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
+                      title="Archiver l'utilisateur"
+                    >
+                      <Archive size={16} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     );
-  }, [loading, users]);
+  }, [loading, users, statusTab]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Top Header & Section Switcher */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Utilisateurs</h2>
-          <p className="text-slate-500">Gérez les comptes clients, propriétaires et agents.</p>
+          <p className="text-slate-500">Gérez les comptes et accédez aux archives d'administration.</p>
+        </div>
+
+        {/* Segmented Switcher: Actifs vs Archives */}
+        <div className="flex bg-slate-200/70 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => setStatusTab('active')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+              statusTab === 'active'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <User2 size={14} /> Comptes Actifs
+          </button>
+          <button
+            onClick={() => setStatusTab('archived')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+              statusTab === 'archived'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Archive size={14} /> Archives Administration
+          </button>
         </div>
       </div>
 
@@ -267,20 +354,20 @@ const UsersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Barre d'onglets premium (Tabs) avec compteurs en temps réel (Tâche 18) */}
+      {/* Role Filter Tabs */}
       <div className="flex border-b border-slate-200 gap-6 bg-slate-50/50 p-2 rounded-lg border">
         {(['all', 'customer', 'owner', 'agent'] as const).map((role) => {
           const isActive = filterRole === role;
           const label = role === 'all' ? 'Tous' : role === 'customer' ? 'Clients' : role === 'owner' ? 'Propriétaires' : 'Agents';
           const count = role === 'all' ? counts.all : role === 'customer' ? counts.customer : role === 'owner' ? counts.owner : counts.agent;
-          
+
           return (
             <button
               key={role}
               onClick={() => setFilterRole(role)}
               className={`pb-2 pt-1 px-4 font-semibold text-sm transition-all rounded-lg ${
-                isActive 
-                  ? 'bg-indigo-600 text-white shadow-md' 
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-md'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
@@ -325,26 +412,36 @@ const UsersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Detail Modal */}
+      {/* User Details Modal */}
       {showDetailModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
-              <h3 className="text-xl font-bold text-slate-800">Détails Utilisateur</h3>
-              <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setShowDetailModal(false)}
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">Détails de l'utilisateur</h3>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                ✕
+              </button>
             </div>
             <div className="p-6 space-y-6">
-              <div className="flex items-center gap-5">
-                <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-bold text-slate-400 overflow-hidden shadow-inner">
+              {/* Entête Utilisateur */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xl font-bold overflow-hidden shadow-inner">
                   {selectedUser.profile_image_url ? (
                     <img src={selectedUser.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    (selectedUser.first_name?.[0] || selectedUser.email[0]).toUpperCase()
+                    (selectedUser.first_name?.[0] || getCleanEmail(selectedUser)[0]).toUpperCase()
                   )}
                 </div>
                 <div>
                   <div className="text-xl font-bold text-slate-800">{selectedUser.first_name} {selectedUser.last_name}</div>
-                  <div className="text-slate-500 font-medium">{selectedUser.email}</div>
+                  <div className="text-slate-500 font-medium">{getCleanEmail(selectedUser)}</div>
                   <div className="text-sm text-slate-400 mt-1 flex items-center gap-2">
                     <span className="bg-slate-100 px-2 py-0.5 rounded text-xs uppercase tracking-wider font-semibold">{selectedUser.role}</span>
                     <span>•</span>
@@ -353,7 +450,7 @@ const UsersView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Informations du Profil (Tâche 24) */}
+              {/* Infos Profil */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
                   <div className="text-slate-400">
@@ -379,8 +476,8 @@ const UsersView: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="block text-xs text-slate-400 uppercase font-bold mb-1 tracking-wider">Statut du compte</span>
-                  <span className={`font-semibold ${selectedUser.is_verified ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {selectedUser.is_verified ? "Vérifié" : "Non Vérifié"}
+                  <span className={`font-semibold ${selectedUser.deleted_at ? 'text-purple-600' : selectedUser.is_verified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {selectedUser.deleted_at ? "Archivé" : selectedUser.is_verified ? "Vérifié" : "Non Vérifié"}
                   </span>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -389,53 +486,66 @@ const UsersView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Détails du Bannissement / Suspension (Tâche 16) */}
+              {/* Alerte si Archivé */}
+              {selectedUser.deleted_at && (
+                <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl space-y-1 text-sm">
+                  <div className="flex items-center gap-2 text-purple-800 font-bold">
+                    <Archive size={16} />
+                    <span>Compte Utilisateur Archivé</span>
+                  </div>
+                  <p className="text-purple-700 text-xs">
+                    <strong>Date d'archivage :</strong> {new Date(selectedUser.deleted_at).toLocaleDateString()}
+                  </p>
+                  <p className="text-purple-700 text-xs">
+                    <strong>Motif :</strong> {selectedUser.deletion_reason || "Aucun motif précisé."}
+                  </p>
+                </div>
+              )}
+
+              {/* Détails du Bannissement / Suspension */}
               {selectedUser.is_suspended && (
                 <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-rose-800 font-bold">
                     <Ban size={16} />
-                    <span>Compte Suspendu / Banni</span>
+                    <span>Compte Suspendu</span>
                   </div>
                   <p className="text-rose-700"><strong>Motif :</strong> {selectedUser.suspension_reason || "Non spécifié."}</p>
-                  {selectedUser.banned_by_admin_id && (
-                    <p className="text-rose-600 text-xs"><strong>Banni par l'Admin :</strong> #{selectedUser.banned_by_admin_id}</p>
-                  )}
-                  {selectedUser.suspension_attachment_url && (
-                    <a 
-                      href={selectedUser.suspension_attachment_url} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 underline font-semibold mt-1"
-                    >
-                      📎 Voir la pièce jointe (Preuve de violation)
-                    </a>
-                  )}
                 </div>
               )}
             </div>
             <div className="p-5 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 flex-wrap">
-              <button
-                onClick={(e) => handleDeleteClick(e, selectedUser)}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
-              >
-                <Trash2 size={16} className="mr-2" /> Supprimer
-              </button>
-
-              {/* Action Suspendre / Activer (Tâche 16) */}
-              {selectedUser.is_suspended ? (
+              {selectedUser.deleted_at ? (
                 <button
-                  onClick={() => handleUnsuspend(selectedUser)}
+                  onClick={() => handleRestoreUser(selectedUser)}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
                 >
-                  <ShieldCheck size={16} className="mr-2" /> Réactiver
+                  <RotateCcw size={16} className="mr-2" /> Restaurer le compte
                 </button>
               ) : (
                 <button
-                  onClick={() => setIsSuspendModalOpen(true)}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                  onClick={(e) => handleDeleteClick(e, selectedUser)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
                 >
-                  <Ban size={16} className="mr-2" /> Suspendre
+                  <Archive size={16} className="mr-2" /> Archiver
                 </button>
+              )}
+
+              {!selectedUser.deleted_at && (
+                selectedUser.is_suspended ? (
+                  <button
+                    onClick={() => handleUnsuspend(selectedUser)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                  >
+                    <ShieldCheck size={16} className="mr-2" /> Réactiver
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsSuspendModalOpen(true)}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold flex items-center shadow-sm hover:shadow transition-all"
+                  >
+                    <Ban size={16} className="mr-2" /> Suspendre
+                  </button>
+                )
               )}
 
               <button
@@ -449,19 +559,19 @@ const UsersView: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete/Archive Confirmation Modal */}
       <ReasonModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={confirmDelete}
-        title="Supprimer l'utilisateur ?"
-        description="ATTENTION : Cette action est irréversible (Soft Delete). L'utilisateur ne pourra plus se connecter et ses biens seront masqués. Un email de notification sera envoyé."
-        label="Motif de la suppression (Optionnel)"
-        confirmLabel="Supprimer définitivement"
+        onConfirm={confirmArchive}
+        title="Archiver le compte utilisateur ?"
+        description="ATTENTION : L'utilisateur ne pourra plus se connecter et ses biens seront masqués. Toutes ses informations seront conservées dans les archives de l'administration."
+        label="Motif de l'archivage (Optionnel)"
+        confirmLabel="Archiver le compte"
         isDanger={true}
       />
 
-      {/* Suspension Modal (Tâche 16) */}
+      {/* Suspension Modal */}
       <SuspensionModal
         isOpen={isSuspendModalOpen}
         onClose={() => setIsSuspendModalOpen(false)}
