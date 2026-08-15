@@ -170,9 +170,13 @@ const VisitsView: React.FC = () => {
                   </div>
 
                   {visit.referral && (
-                    <p className="text-sm text-indigo-600 flex items-center mt-1 bg-indigo-50 w-fit px-2 py-0.5 rounded border border-indigo-100">
-                      <UserIcon size={12} className="mr-1" />
-                      Parrainé par : {visit.referral.agent_name} (Code : {visit.referral.code})
+                    <p className="text-sm text-indigo-700 flex items-center mt-2 bg-indigo-50/80 w-fit px-2.5 py-1 rounded-lg border border-indigo-100 font-medium">
+                      <UserIcon size={13} className="mr-1 text-indigo-500" />
+                      Parrainé par : <span className="font-bold text-slate-800 ml-1">{visit.referral.agent_name}</span>
+                      {visit.referral.agent_phone && (
+                        <span className="ml-1 text-indigo-600 font-bold">({visit.referral.agent_phone})</span>
+                      )}
+                      <span className="ml-1.5 text-slate-400 text-xs font-normal">(Code : {visit.referral.code})</span>
                     </p>
                   )}
                 </div>

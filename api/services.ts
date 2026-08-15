@@ -53,6 +53,7 @@ export interface VisitRequest {
         id: number;
         code: string;
         agent_name: string;
+        agent_phone?: string;
         agent_email?: string;
     };
 }
